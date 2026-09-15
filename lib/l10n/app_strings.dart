@@ -56,6 +56,10 @@ class AppStrings {
   static const editEvent = 'edit_event';
   static const deleteEvent = 'delete_event';
   static const eventDeleted = 'event_deleted';
+  static const eventManagementTitle = 'event_management_title';
+  static const pick = 'pick';
+  static const start = 'start';
+  static const end = 'end';
 
   // =========================
   // QUESTIONS & ANSWERS
@@ -110,6 +114,7 @@ class AppStrings {
   static const passwordChanged = 'password_changed';
   static const passwordMismatch = 'password_mismatch';
   static const invalidPassword = 'invalid_password';
+  static const passwordOptional = 'password_optional';
   static const login = 'login';
   static const register = 'register';
   static const logout = 'logout';
@@ -191,7 +196,19 @@ class AppStrings {
   static const minutesAgo = 'minutes_ago';
   static const hoursAgo = 'hours_ago';
   static const daysAgo = 'days_ago';
+  static const weekAgo = 'week_ago';
+  static const weeksAgo = 'weeks_ago';
   static const qnaManagementTitle = 'qna_management_title';
+  static const refresh = 'refresh';
+  static const next = 'next';
+  static const notSet = 'not_set';
+  static const pleaseSetAllPrayerTimes = 'please_set_all_prayer_times';
+  static const pleaseSetJummahTime = 'please_set_jummah_time';
+  static const questionsWillAppearHere = 'questions_will_appear_here';
+  static const eventsWillAppearHere = 'events_will_appear_here';
+  static const questionsWillAppearHereAdmin = 'questions_will_appear_here_admin';
+  static const updated = 'updated';
+  static const updatedTimeAgo = 'updated_time_ago';
 
   // =========================
   // MASJID SELECTION

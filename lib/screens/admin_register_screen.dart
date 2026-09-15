@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart' as auth;
 import '../models/app_data.dart';
 import '../services/firebase_service.dart';
 import '../l10n/app_localization.dart';
 import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
 
-/// Screen for registering a new masjid
-/// Admins/Imams can create a new masjid account here
+/// Screen for registering a new masjid with Firebase Auth
+/// Creates a Firebase Auth account + masjid document in Firestore
 class AdminRegisterScreen extends StatefulWidget {
   const AdminRegisterScreen({super.key});
 
@@ -15,13 +16,13 @@ class AdminRegisterScreen extends StatefulWidget {
 }
 
 class _AdminRegisterScreenState extends State<AdminRegisterScreen> {
-  // Controllers for form fields
   final masjidNameController = TextEditingController();
   final locationController = TextEditingController();
-  final usernameController = TextEditingController();
+  final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
   final FirebaseService _firebaseService = FirebaseService();
+  final auth.FirebaseAuth _firebaseAuth = auth.FirebaseAuth.instance;
 
   String? errorMessage;
   String? successMessage;
@@ -31,24 +32,24 @@ class _AdminRegisterScreenState extends State<AdminRegisterScreen> {
   void dispose() {
     masjidNameController.dispose();
     locationController.dispose();
-    usernameController.dispose();
+    emailController.dispose();
     passwordController.dispose();
     confirmPasswordController.dispose();
     super.dispose();
   }
 
-  /// Handle the registration of a new masjid
+  /// Handle the registration of a new masjid using Firebase Auth
   Future<void> handleRegister() async {
     final masjidName = masjidNameController.text.trim();
     final location = locationController.text.trim();
-    final username = usernameController.text.trim();
+    final email = emailController.text.trim();
     final password = passwordController.text;
     final confirmPassword = confirmPasswordController.text;
 
     // Simple validation
     if (masjidName.isEmpty ||
         location.isEmpty ||
-        username.isEmpty ||
+        email.isEmpty ||
         password.isEmpty) {
       setState(() {
         errorMessage = appLocalization.t(AppStrings.allFieldsRequired);
@@ -79,30 +80,40 @@ class _AdminRegisterScreenState extends State<AdminRegisterScreen> {
     });
 
     try {
-      // Default prayer times for new masjid
-      final defaultPrayerTimes = [
-        PrayerTime(name: 'Fajr', time: '5:30 AM'),
-        PrayerTime(name: 'Dhuhr', time: '12:45 PM'),
-        PrayerTime(name: 'Asr', time: '3:30 PM'),
-        PrayerTime(name: 'Maghrib', time: '6:15 PM'),
-        PrayerTime(name: 'Isha', time: '7:45 PM'),
-      ];
+      // Step 1: Create Firebase Auth account
+      final credential = await _firebaseAuth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
 
-      // Create new masjid object
+      if (credential.user == null) {
+        setState(() {
+          errorMessage = 'Failed to create account';
+        });
+        return;
+      }
+
+      // Step 2: Update display name
+      await credential.user!.updateDisplayName(masjidName);
+
+      // Step 3: Create masjid in Firestore with the admin's UID
       final newMasjid = Masjid(
         name: masjidName,
         location: location,
-        username: username,
-        password: password,
-        prayerTimes: defaultPrayerTimes,
-        jummahTime: '1:00 PM',
+        username: email,
+        prayerTimes: [
+          PrayerTime(name: 'Fajr', time: ''),
+          PrayerTime(name: 'Dhuhr', time: ''),
+          PrayerTime(name: 'Asr', time: ''),
+          PrayerTime(name: 'Maghrib', time: ''),
+          PrayerTime(name: 'Isha', time: ''),
+        ],
+        jummahTime: '',
       );
 
-      // Try to register in Firestore
       final success = await _firebaseService.registerMasjid(newMasjid);
 
       if (success) {
-        // Also add to local list
         AppData.allMasjids.add(newMasjid);
 
         if (mounted) {
@@ -114,7 +125,7 @@ class _AdminRegisterScreenState extends State<AdminRegisterScreen> {
           // Clear the form
           masjidNameController.clear();
           locationController.clear();
-          usernameController.clear();
+          emailController.clear();
           passwordController.clear();
           confirmPasswordController.clear();
 
@@ -129,6 +140,16 @@ class _AdminRegisterScreenState extends State<AdminRegisterScreen> {
           errorMessage = appLocalization.t(AppStrings.registrationFailed);
         });
       }
+    } on auth.FirebaseAuthException catch (e) {
+      setState(() {
+        if (e.code == 'email-already-in-use') {
+          errorMessage = 'An account with this email already exists';
+        } else if (e.code == 'weak-password') {
+          errorMessage = 'The password provided is too weak';
+        } else {
+          errorMessage = e.message ?? 'Registration failed';
+        }
+      });
     } catch (e) {
       setState(() {
         errorMessage =
@@ -203,17 +224,18 @@ class _AdminRegisterScreenState extends State<AdminRegisterScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Username field
+              // Email field
               TextField(
-                controller: usernameController,
+                controller: emailController,
                 enabled: !isLoading,
+                keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
-                  labelText: appLocalization.t(AppStrings.username),
-                  hintText: appLocalization.t(AppStrings.mustBeUnique),
+                  labelText: 'Email',
+                  hintText: 'admin@masjid.com',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  prefixIcon: const Icon(Icons.person),
+                  prefixIcon: const Icon(Icons.email),
                 ),
               ),
               const SizedBox(height: 16),
@@ -264,7 +286,10 @@ class _AdminRegisterScreenState extends State<AdminRegisterScreen> {
                     ),
                     child: Text(
                       errorMessage!,
-                      style: TextStyle(color: ColorPalette.error, fontSize: 14),
+                      style: TextStyle(
+                        color: ColorPalette.error,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
                 ),

@@ -1,8 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
-import 'dart:math' as math;
+import '../firebase_options.dart';
 import '../models/app_data.dart';
+import '../utils/distance_utils.dart';
 
 /// Service class for all Firebase Firestore operations
 class FirebaseService {
@@ -15,24 +16,13 @@ class FirebaseService {
 
   FirebaseService._internal();
 
-  /// Initialize Firebase
+  /// Initialize Firebase using the platform-specific options defined in
+  /// `lib/firebase_options.dart`. Run `flutterfire configure` to regenerate
+  /// the file with project-specific credentials for android, ios, macos, etc.
   Future<void> initialize() async {
-    if (kIsWeb) {
-      // Web platform Firebase initialization
-      await Firebase.initializeApp(
-        options: const FirebaseOptions(
-          apiKey: 'AIzaSyDf62La3ntI8rvL8SQqv7GH69pRqfFU4h8',
-          authDomain: 'masjid-prayer-app-49f50.firebaseapp.com',
-          projectId: 'masjid-prayer-app-49f50',
-          storageBucket: 'masjid-prayer-app-49f50.firebasestorage.app',
-          messagingSenderId: '493201204446',
-          appId: '1:493201204446:web:811c50faa61c1b51b30e4f',
-        ),
-      );
-    } else {
-      // Mobile platforms will use FirebaseOptions from google-services.json / GoogleService-Info.plist
-      await Firebase.initializeApp();
-    }
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
     _firestore = FirebaseFirestore.instance;
 
     // Set Firestore settings for better performance
@@ -50,7 +40,7 @@ class FirebaseService {
           .map((doc) => Masjid.fromFirestore(doc.data(), doc.id))
           .toList();
     } catch (e) {
-      print('Error fetching masjids: $e');
+      debugPrint('Error fetching masjids: $e');
       return [];
     }
   }
@@ -64,7 +54,7 @@ class FirebaseService {
       }
       return null;
     } catch (e) {
-      print('Error fetching masjid: $e');
+      debugPrint('Error fetching masjid: $e');
       return null;
     }
   }
@@ -108,7 +98,7 @@ class FirebaseService {
       // Calculate distance for each masjid
       for (var masjid in masjids) {
         if (masjid.latitude != null && masjid.longitude != null) {
-          masjid.distanceFromUser = _calculateDistance(
+          masjid.distanceFromUser = DistanceUtils.calculateDistance(
             userLat,
             userLon,
             masjid.latitude!,
@@ -126,38 +116,9 @@ class FirebaseService {
 
       return masjids;
     } catch (e) {
-      print('Error fetching masjids sorted by distance: $e');
+      debugPrint('Error fetching masjids sorted by distance: $e');
       return [];
     }
-  }
-
-  /// Calculate distance between two coordinates using Haversine formula
-  /// Returns distance in kilometers
-  double _calculateDistance(
-    double lat1,
-    double lon1,
-    double lat2,
-    double lon2,
-  ) {
-    const R = 6371; // Earth's radius in kilometers
-
-    final dLat = _toRadians(lat2 - lat1);
-    final dLon = _toRadians(lon2 - lon1);
-
-    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(_toRadians(lat1)) *
-            math.cos(_toRadians(lat2)) *
-            math.sin(dLon / 2) *
-            math.sin(dLon / 2);
-
-    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
-    final distance = R * c;
-
-    return distance;
-  }
-
-  double _toRadians(double degree) {
-    return degree * (math.pi / 180);
   }
 
   /// Authenticate admin - check username and password
@@ -175,7 +136,7 @@ class FirebaseService {
       }
       return null;
     } catch (e) {
-      print('Error authenticating admin: $e');
+      debugPrint('Error authenticating admin: $e');
       return null;
     }
   }
@@ -198,7 +159,7 @@ class FirebaseService {
       await _firestore.collection('masjids').add(masjid.toJson());
       return true;
     } catch (e) {
-      print('Error registering masjid: $e');
+      debugPrint('Error registering masjid: $e');
       return false;
     }
   }
@@ -213,7 +174,7 @@ class FirebaseService {
       });
       return true;
     } catch (e) {
-      print('Error updating prayer times: $e');
+      debugPrint('Error updating prayer times: $e');
       return false;
     }
   }
@@ -227,7 +188,7 @@ class FirebaseService {
       });
       return true;
     } catch (e) {
-      print('Error updating Jummah time: $e');
+      debugPrint('Error updating Jummah time: $e');
       return false;
     }
   }
@@ -238,7 +199,7 @@ class FirebaseService {
       await _firestore.collection('masjids').doc(masjidId).delete();
       return true;
     } catch (e) {
-      print('Error deleting masjid: $e');
+      debugPrint('Error deleting masjid: $e');
       return false;
     }
   }
@@ -251,7 +212,7 @@ class FirebaseService {
       // Check if data already exists
       final snapshot = await masjidsRef.limit(1).get();
       if (snapshot.docs.isNotEmpty) {
-        print('Sample data already exists');
+        debugPrint('Sample data already exists');
         return;
       }
 
@@ -262,7 +223,6 @@ class FirebaseService {
           name: 'Central Masjid',
           location: 'Downtown',
           username: 'admin1',
-          password: 'pass123',
           prayerTimes: [
             PrayerTime(name: 'Fajr', time: '5:30 AM'),
             PrayerTime(name: 'Dhuhr', time: '12:45 PM'),
@@ -278,7 +238,6 @@ class FirebaseService {
           name: 'New Mosque',
           location: 'Uptown',
           username: 'admin2',
-          password: 'pass456',
           prayerTimes: [
             PrayerTime(name: 'Fajr', time: '5:25 AM'),
             PrayerTime(name: 'Dhuhr', time: '12:50 PM'),
@@ -294,7 +253,6 @@ class FirebaseService {
           name: 'Green Valley Mosque',
           location: 'Eastside',
           username: 'admin3',
-          password: 'pass789',
           prayerTimes: [
             PrayerTime(name: 'Fajr', time: '5:35 AM'),
             PrayerTime(name: 'Dhuhr', time: '12:40 PM'),
@@ -312,9 +270,9 @@ class FirebaseService {
         await masjidsRef.add(masjid.toJson());
       }
 
-      print('Sample data initialized successfully');
+      debugPrint('Sample data initialized successfully');
     } catch (e) {
-      print('Error initializing sample data: $e');
+      debugPrint('Error initializing sample data: $e');
     }
   }
 }

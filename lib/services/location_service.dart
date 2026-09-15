@@ -1,5 +1,5 @@
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
-import 'dart:math' as math;
 
 /// Service for handling location permissions and fetching user location
 class LocationService {
@@ -30,7 +30,7 @@ class LocationService {
       return permission == LocationPermission.whileInUse ||
           permission == LocationPermission.always;
     } catch (e) {
-      print('Error requesting location permission: $e');
+      debugPrint('Error requesting location permission: $e');
       return false;
     }
   }
@@ -42,14 +42,14 @@ class LocationService {
       // Check if location services are enabled
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        print('Location services are disabled.');
+        debugPrint('Location services are disabled.');
         return null;
       }
 
       // Request permission if not already granted
       final hasPermission = await requestLocationPermission();
       if (!hasPermission) {
-        print('Location permission denied');
+        debugPrint('Location permission denied');
         return null;
       }
 
@@ -60,7 +60,7 @@ class LocationService {
 
       return position;
     } catch (e) {
-      print('Error getting user location: $e');
+      debugPrint('Error getting user location: $e');
       return null;
     }
   }
@@ -72,37 +72,9 @@ class LocationService {
       return permission == LocationPermission.whileInUse ||
           permission == LocationPermission.always;
     } catch (e) {
-      print('Error checking location permission: $e');
+      debugPrint('Error checking location permission: $e');
       return false;
     }
   }
 
-  /// Get the distance between two locations using Haversine formula
-  /// Returns distance in kilometers
-  static double calculateDistance(
-    double lat1,
-    double lon1,
-    double lat2,
-    double lon2,
-  ) {
-    const R = 6371; // Earth's radius in kilometers
-
-    final dLat = _toRad(lat2 - lat1);
-    final dLon = _toRad(lon2 - lon1);
-
-    final a = (math.sin(dLat / 2) * math.sin(dLat / 2)) +
-        (math.cos(_toRad(lat1)) *
-            math.cos(_toRad(lat2)) *
-            math.sin(dLon / 2) *
-            math.sin(dLon / 2));
-
-    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
-    final distance = R * c;
-
-    return distance;
-  }
-
-  static double _toRad(double degree) {
-    return degree * (math.pi / 180);
-  }
 }

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import 'dart:async';
 import '../models/app_data.dart';
+import '../providers/masjid_provider.dart';
 import '../services/firebase_service.dart';
 import '../l10n/app_localization.dart';
 import '../l10n/app_strings.dart';
@@ -23,10 +25,9 @@ class _PrayerPageState extends State<PrayerPage> {
   @override
   void initState() {
     super.initState();
-    // Start countdown timer to update UI every second
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
-        setState(() {}); // Rebuild to update countdown display
+        setState(() {});
       }
     });
   }
@@ -39,13 +40,13 @@ class _PrayerPageState extends State<PrayerPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Get the selected masjid from our app data
-    final masjid = AppData.selectedMasjid;
+    final masjidProvider = context.watch<MasjidProvider>();
+    final masjid = masjidProvider.selectedMasjid ?? AppData.selectedMasjid;
 
     if (masjid == null || masjid.id.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Error')),
-        body: const Center(child: Text('No masjid selected')),
+        appBar: AppBar(title: Text(appLocalization.t(AppStrings.error))),
+        body: Center(child: Text(appLocalization.t(AppStrings.noMasjidSelected))),
       );
     }
 
@@ -56,7 +57,7 @@ class _PrayerPageState extends State<PrayerPage> {
           style: GoogleFonts.poppins(
             fontSize: 22,
             fontWeight: FontWeight.w600,
-            color: ColorPalette.lightBg,
+            color: const Color(0xFFFAF7F2),
           ),
         ),
         elevation: 0,
@@ -65,7 +66,6 @@ class _PrayerPageState extends State<PrayerPage> {
       body: StreamBuilder<Masjid?>(
         stream: _firebaseService.getMasjidStream(masjid.id),
         builder: (context, snapshot) {
-          // Show loading state initially
           if (snapshot.connectionState == ConnectionState.waiting &&
               !snapshot.hasData) {
             return Container(
@@ -74,8 +74,8 @@ class _PrayerPageState extends State<PrayerPage> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    ColorPalette.lightBg,
-                    ColorPalette.lightBg.withValues(alpha: 0.95),
+                    Theme.of(context).colorScheme.surface,
+                    Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
                   ],
                 ),
               ),
@@ -89,7 +89,6 @@ class _PrayerPageState extends State<PrayerPage> {
             );
           }
 
-          // Handle errors
           if (snapshot.hasError) {
             return Container(
               decoration: BoxDecoration(
@@ -97,8 +96,8 @@ class _PrayerPageState extends State<PrayerPage> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    ColorPalette.lightBg,
-                    ColorPalette.lightBg.withValues(alpha: 0.95),
+                    Theme.of(context).colorScheme.surface,
+                    Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
                   ],
                 ),
               ),
@@ -106,7 +105,7 @@ class _PrayerPageState extends State<PrayerPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.error_outline,
                       size: 64,
                       color: ColorPalette.secondary,
@@ -127,14 +126,10 @@ class _PrayerPageState extends State<PrayerPage> {
             );
           }
 
-          // Get the masjid data from stream or use cached data
           final currentMasjid = snapshot.data ?? masjid;
           AppData.selectedMasjid = currentMasjid;
 
-          // Get all prayers including Jummah
           final allPrayers = _getAllPrayersWithJummah(currentMasjid);
-
-          // Find the next upcoming prayer
           final nextPrayerIndex = _getNextPrayerIndex(allPrayers);
           final nextPrayer = nextPrayerIndex >= 0
               ? allPrayers[nextPrayerIndex]
@@ -146,8 +141,8 @@ class _PrayerPageState extends State<PrayerPage> {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  ColorPalette.lightBg,
-                  ColorPalette.lightBg.withValues(alpha: 0.92),
+                  Theme.of(context).colorScheme.surface,
+                  Theme.of(context).colorScheme.surface.withValues(alpha: 0.92),
                 ],
               ),
             ),
@@ -161,17 +156,17 @@ class _PrayerPageState extends State<PrayerPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Featured Upcoming Prayer Card
                     _buildUpcomingPrayerCard(
                       nextPrayer,
                       currentMasjid,
                       nextPrayerIndex,
                     ),
                     const SizedBox(height: 32),
-
-                    // Remaining Prayers Section Title
                     Padding(
-                      padding: const EdgeInsets.only(left: 8.0, bottom: 16.0),
+                      padding: const EdgeInsets.only(
+                        left: 8.0,
+                        bottom: 16.0,
+                      ),
                       child: Text(
                         appLocalization.t(AppStrings.allPrayers),
                         style: GoogleFonts.poppins(
@@ -181,14 +176,11 @@ class _PrayerPageState extends State<PrayerPage> {
                         ),
                       ),
                     ),
-
-                    // All Prayer Cards
                     _buildPrayersList(
                       allPrayers,
                       currentMasjid,
                       nextPrayerIndex,
                     ),
-
                     const SizedBox(height: 32),
                   ],
                 ),
@@ -200,16 +192,12 @@ class _PrayerPageState extends State<PrayerPage> {
     );
   }
 
-  /// Build the main featured upcoming prayer card
   Widget _buildUpcomingPrayerCard(
     _PrayerDisplay prayer,
     Masjid masjid,
     int prayerIndex,
   ) {
-    // Determine gradient colors based on prayer time
     final gradientColors = _getPrayerGradientColors(prayer.name);
-
-    // Calculate time remaining until prayer
     final timeRemaining = _calculateTimeRemaining(prayer.time);
 
     return Container(
@@ -277,7 +265,7 @@ class _PrayerPageState extends State<PrayerPage> {
                     vertical: 12,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.25),
+                    color: Colors.white.withValues(alpha: 0.25),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -295,7 +283,7 @@ class _PrayerPageState extends State<PrayerPage> {
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                   ),
                 ),
               ],
@@ -306,7 +294,6 @@ class _PrayerPageState extends State<PrayerPage> {
     );
   }
 
-  /// Build list of all prayers in smaller cards
   Widget _buildPrayersList(
     List<_PrayerDisplay> prayers,
     Masjid masjid,
@@ -320,13 +307,11 @@ class _PrayerPageState extends State<PrayerPage> {
       itemBuilder: (context, index) {
         final prayer = prayers[index];
         final isNext = index == nextPrayerIndex;
-
         return _buildPrayerCard(prayer, masjid, index, isNext);
       },
     );
   }
 
-  /// Build individual prayer time card
   Widget _buildPrayerCard(
     _PrayerDisplay prayer,
     Masjid masjid,
@@ -335,7 +320,7 @@ class _PrayerPageState extends State<PrayerPage> {
   ) {
     final cardColor = isNext
         ? ColorPalette.primary.withValues(alpha: 0.08)
-        : const Color.fromRGBO(255, 255, 255, 1).withOpacity(0.7);
+        : const Color.fromRGBO(255, 255, 255, 1).withValues(alpha: 0.7);
 
     return Container(
       decoration: BoxDecoration(
@@ -376,11 +361,11 @@ class _PrayerPageState extends State<PrayerPage> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Updated ${_getLastUpdatedText(masjid.lastUpdated)}',
+                        '${appLocalization.t(AppStrings.updated)} ${_getLastUpdatedText(masjid.lastUpdated)}',
                         style: GoogleFonts.poppins(
                           fontSize: 11,
                           fontWeight: FontWeight.w400,
-                          color: Colors.grey.shade600,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
                     ],
@@ -412,7 +397,7 @@ class _PrayerPageState extends State<PrayerPage> {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        'Next',
+                        appLocalization.t(AppStrings.next),
                         style: GoogleFonts.poppins(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
@@ -429,7 +414,6 @@ class _PrayerPageState extends State<PrayerPage> {
     );
   }
 
-  /// Get icon for prayer based on prayer name
   Widget _getPrayerIcon(String prayerName, {double size = 32}) {
     IconData icon;
     Color color;
@@ -440,7 +424,7 @@ class _PrayerPageState extends State<PrayerPage> {
         color = const Color(0xFFFFA500);
         break;
       case 'dhuhr':
-        icon = Icons.sunny_snowing;
+        icon = Icons.wb_sunny;
         color = const Color(0xFFFFD700);
         break;
       case 'asr':
@@ -467,14 +451,13 @@ class _PrayerPageState extends State<PrayerPage> {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Icon(icon, color: color, size: size),
     );
   }
 
-  /// Get gradient colors based on prayer timings
   List<Color> _getPrayerGradientColors(String prayerName) {
     switch (prayerName.toLowerCase()) {
       case 'fajr':
@@ -497,23 +480,17 @@ class _PrayerPageState extends State<PrayerPage> {
     }
   }
 
-  /// Calculate time remaining until next prayer
   String _calculateTimeRemaining(String prayerTime) {
     try {
       final now = DateTime.now();
       final prayerMinutes = _convertTimeToMinutes(prayerTime);
       final nowMinutes = now.hour * 60 + now.minute;
-
       var diffMinutes = prayerMinutes - nowMinutes;
-
-      // If prayer time is in the past, it's for tomorrow
       if (diffMinutes < 0) {
         diffMinutes = (24 * 60) + diffMinutes;
       }
-
       final hours = diffMinutes ~/ 60;
       final minutes = diffMinutes % 60;
-
       if (hours == 0) {
         final minStr = minutes.toString().padLeft(2, '0');
         return '$minStr ${appLocalization.t(AppStrings.minutesRemaining)}';
@@ -526,74 +503,58 @@ class _PrayerPageState extends State<PrayerPage> {
     }
   }
 
-  /// Get last updated text
   String _getLastUpdatedText(DateTime? lastUpdated) {
-    if (lastUpdated == null) return 'just now';
-
+    if (lastUpdated == null) return appLocalization.t(AppStrings.justNow);
     final now = DateTime.now();
     final difference = now.difference(lastUpdated);
-
     if (difference.inSeconds < 60) {
-      return 'just now';
+      return appLocalization.t(AppStrings.justNow);
     } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}m ago';
+      return '${difference.inMinutes}${appLocalization.t(AppStrings.minutesAgo)}';
     } else if (difference.inHours < 24) {
-      return '${difference.inHours}h ago';
+      return '${difference.inHours}${appLocalization.t(AppStrings.hoursAgo)}';
     } else if (difference.inDays < 7) {
-      return '${difference.inDays}d ago';
+      return '${difference.inDays}${appLocalization.t(AppStrings.daysAgo)}';
     } else {
-      return '${(difference.inDays / 7).toStringAsFixed(0)}w ago';
+      final weeks = (difference.inDays / 7).toStringAsFixed(0);
+      return '$weeks${appLocalization.t(AppStrings.weeksAgo)}';
     }
   }
 
-  /// Get all prayers including Jummah as a prayer object
   List<_PrayerDisplay> _getAllPrayersWithJummah(Masjid masjid) {
     final prayers = <_PrayerDisplay>[];
-
-    // Add all 5 daily prayers
     for (final prayer in masjid.prayerTimes) {
       prayers.add(_PrayerDisplay(name: prayer.name, time: prayer.time));
     }
-
-    // Add Jummah as part of the prayers
     if (masjid.jummahTime != null && masjid.jummahTime!.isNotEmpty) {
       prayers.add(_PrayerDisplay(name: 'Jummah', time: masjid.jummahTime!));
     }
-
     return prayers;
   }
 
-  /// Determine which prayer is next based on current time
   int _getNextPrayerIndex(List<_PrayerDisplay> prayers) {
     final now = DateTime.now();
     final currentTimeInMinutes = now.hour * 60 + now.minute;
-
-    // Convert prayer times to minutes for comparison
     for (int i = 0; i < prayers.length; i++) {
       final prayerTime = _convertTimeToMinutes(prayers[i].time);
       if (prayerTime >= currentTimeInMinutes) {
         return i;
       }
     }
-
-    // If no prayer found today, first prayer is tomorrow (Fajr usually)
     return 0;
   }
 
-  /// Convert time string like "5:30 AM" to minutes since midnight
   int _convertTimeToMinutes(String timeString) {
     try {
       final parts = timeString.replaceAll(RegExp(r'\s'), '').split(':');
       var hours = int.parse(parts[0]);
       final minutes = int.parse(parts[1].replaceAll(RegExp(r'[AP]M'), ''));
       final isPM = timeString.toUpperCase().contains('PM');
-
       if (isPM && hours != 12) {
         hours += 12;
       } else if (!isPM && hours == 12) {
         hours = 0;
       }
-
       return hours * 60 + minutes;
     } catch (e) {
       return 0;
@@ -601,7 +562,6 @@ class _PrayerPageState extends State<PrayerPage> {
   }
 }
 
-/// Helper class to display prayer information
 class _PrayerDisplay {
   final String name;
   final String time;

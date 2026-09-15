@@ -86,4 +86,14 @@ class StorageService {
   Future<bool> clearAll() async {
     return await _preferences.clear();
   }
+
+  /// Save notifications preference
+  Future<bool> saveNotificationsEnabled(bool enabled) async {
+    return await _preferences.setBool('notifications_enabled', enabled);
+  }
+
+  /// Get notifications preference
+  bool getNotificationsEnabled() {
+    return _preferences.getBool('notifications_enabled') ?? true;
+  }
 }

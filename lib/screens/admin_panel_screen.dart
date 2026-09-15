@@ -6,6 +6,7 @@ import '../l10n/app_localization.dart';
 import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
 import 'admin_qa_screen.dart';
+import 'admin_events_screen.dart';
 import 'masjid_selection_screen.dart';
 
 /// Admin Panel - where admins can edit prayer times for their masjid
@@ -78,7 +79,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
   /// Convert TimeOfDay to display string (e.g., '5:30 AM')
   String _formatTimeOfDay(TimeOfDay? time) {
-    if (time == null) return 'Not set';
+    if (time == null) return appLocalization.t(AppStrings.notSet);
     final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
     final period = time.hour < 12 ? 'AM' : 'PM';
     return '${hour.toString().padLeft(1, '0')}:${time.minute.toString().padLeft(2, '0')} $period';
@@ -110,7 +111,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           data: Theme.of(context).copyWith(
             timePickerTheme: TimePickerThemeData(
               backgroundColor: Theme.of(context).colorScheme.surface,
-              dialBackgroundColor: ColorPalette.primary.withOpacity(0.1),
+              dialBackgroundColor: ColorPalette.primary.withValues(alpha: 0.1),
               hourMinuteShape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -140,7 +141,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           data: Theme.of(context).copyWith(
             timePickerTheme: TimePickerThemeData(
               backgroundColor: Theme.of(context).colorScheme.surface,
-              dialBackgroundColor: ColorPalette.primary.withOpacity(0.1),
+              dialBackgroundColor: ColorPalette.primary.withValues(alpha: 0.1),
               hourMinuteShape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -171,14 +172,14 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     // Validate all times are set
     if (!prayerTimes.every(_isValidTime)) {
       setState(() {
-        errorMessage = 'Please set all prayer times';
+        errorMessage = appLocalization.t(AppStrings.pleaseSetAllPrayerTimes);
       });
       return;
     }
 
     if (!_isValidTime(jummahTime)) {
       setState(() {
-        errorMessage = 'Please set Jummah time';
+        errorMessage = appLocalization.t(AppStrings.pleaseSetJummahTime);
       });
       return;
     }
@@ -254,16 +255,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     _storageService.clearAdminLoginStatus();
     AppData.selectedMasjid = null;
     AppData.selectedMasjidId = null;
-    Navigator.pushReplacementNamed(
-      context,
-      MaterialPageRoute(
-            builder: (_) => const MasjidSelectionScreen(),
-          ).settings.name ??
-          '/',
-    );
-    Navigator.push(
+    // Clear the entire navigation stack and go back to masjid selection
+    Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const MasjidSelectionScreen()),
+      (route) => false,
     );
   }
 
@@ -273,7 +269,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
     if (masjid == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Error')),
+        appBar: AppBar(title: Text(appLocalization.t(AppStrings.error))),
         body: Center(
           child: Text(appLocalization.t(AppStrings.noMasjidSelected2)),
         ),
@@ -294,9 +290,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             child: Center(
               child: TextButton(
                 onPressed: isSaving ? null : handleLogout,
-                child: const Text(
-                  'Logout',
-                  style: TextStyle(color: Colors.white),
+                child: Text(
+                  appLocalization.t(AppStrings.logout),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
                 ),
               ),
             ),
@@ -313,7 +309,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: ColorPalette.primary.withOpacity(0.1),
+                color: ColorPalette.primary.withValues(alpha: 0.1),
                 border: Border.all(color: ColorPalette.primary, width: 1),
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -347,9 +343,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   Text(
                     masjid.location,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Colors.grey.shade400
-                          : Colors.grey.shade600,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                 ],
@@ -373,7 +367,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                             width: 1.5,
                           ),
                           borderRadius: BorderRadius.circular(12),
-                          color: ColorPalette.secondary.withOpacity(0.05),
+                          color: ColorPalette.secondary.withValues(alpha: 0.05),
                         ),
                         child: Padding(
                           padding: const EdgeInsets.all(12.0),
@@ -433,9 +427,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                           width: 1,
                         ),
                         borderRadius: BorderRadius.circular(12),
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? ColorPalette.darkCardBg
-                            : Colors.white,
+                        color: Theme.of(context).colorScheme.surface,
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(12.0),
@@ -493,7 +485,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: ColorPalette.success.withOpacity(0.15),
+                    color: ColorPalette.success.withValues(alpha: 0.15),
                     border: Border.all(color: ColorPalette.success, width: 1.5),
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -523,7 +515,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: ColorPalette.error.withOpacity(0.15),
+                    color: ColorPalette.error.withValues(alpha: 0.15),
                     border: Border.all(color: ColorPalette.error, width: 1.5),
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -563,9 +555,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       backgroundColor: ColorPalette.primary,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.question_answer,
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.onPrimary,
                     ),
                     label: Text(
                       appLocalization.t(AppStrings.qnaManagement),
@@ -576,38 +568,68 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                // Save Changes Button
+                const SizedBox(width: 8),
+                // Events Management Button
                 Expanded(
-                  child: ElevatedButton(
-                    onPressed: isSaving ? null : handleSave,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AdminEventsScreen(),
+                        ),
+                      );
+                    },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: ColorPalette.success,
+                      backgroundColor: ColorPalette.primary,
                       padding: const EdgeInsets.symmetric(vertical: 14),
-                      disabledBackgroundColor: Colors.grey,
                     ),
-                    child: isSaving
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          )
-                        : Text(
-                            appLocalization.t(AppStrings.savePrayerTimes),
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
+                    icon: Icon(
+                      Icons.event,
+                      color: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                    label: Text(
+                      appLocalization.t(AppStrings.eventManagementTitle),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 8),
+            // Save Changes Button (full width on its own row)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: isSaving ? null : handleSave,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: ColorPalette.success,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  disabledBackgroundColor: Theme.of(context).colorScheme.outline,
+                ),
+                child: isSaving
+                    ? SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Theme.of(context).colorScheme.onPrimary,
+                          ),
+                        ),
+                      )
+                    : Text(
+                        appLocalization.t(AppStrings.savePrayerTimes),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onPrimary,
+                        ),
+                      ),
+              ),
             ),
           ],
         ),

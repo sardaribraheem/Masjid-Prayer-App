@@ -1,25 +1,34 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart' as auth;
+import 'package:provider/provider.dart';
 import '../models/app_data.dart';
-import '../theme/app_state.dart';
+import '../providers/settings_provider.dart';
 import '../l10n/app_localization.dart';
 import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
 import 'admin_login_screen.dart';
+import 'edit_profile_screen.dart';
 import 'masjid_selection_screen.dart';
 
 /// Settings Page - Account, profile, preferences
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({Key? key}) : super(key: key);
+  const SettingsPage({super.key});
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  bool _notificationsEnabled = true;
+  final auth.FirebaseAuth _firebaseAuth = auth.FirebaseAuth.instance;
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = _firebaseAuth.currentUser;
+    final isLoggedIn = currentUser != null;
+    final displayName =
+        currentUser?.displayName ?? currentUser?.email ?? 'Guest';
+    final email = currentUser?.email ?? '';
+
     return Scaffold(
       appBar: AppBar(
         title: Text(appLocalization.t(AppStrings.settings)),
@@ -45,7 +54,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '👤 ${appLocalization.t(AppStrings.userProfile)}',
+                      appLocalization.t(AppStrings.userProfile),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: ColorPalette.primary,
                         fontWeight: FontWeight.bold,
@@ -59,7 +68,8 @@ class _SettingsPageState extends State<SettingsPage> {
                           height: 70,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: ColorPalette.primary.withValues(alpha: 0.2),
+                            color:
+                                ColorPalette.primary.withValues(alpha: 0.2),
                           ),
                           child: Icon(
                             Icons.person,
@@ -73,7 +83,7 @@ class _SettingsPageState extends State<SettingsPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                appLocalization.t(AppStrings.userProfile),
+                                displayName,
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -81,29 +91,90 @@ class _SettingsPageState extends State<SettingsPage> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                appLocalization.t(AppStrings.settings),
+                                isLoggedIn
+                                    ? email
+                                    : appLocalization
+                                        .t(AppStrings.guest),
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: ColorPalette.lightTextSecondary,
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              ElevatedButton(
-                                onPressed: () {
-                                  // Edit profile
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: ColorPalette.primary,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
+                              if (!isLoggedIn)
+                                ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const AdminLoginScreen(),
+                                      ),
+                                    );
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: ColorPalette.primary,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
                                   ),
+                                  child: Text(
+                                    appLocalization.t(AppStrings.login),
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                )
+                              else
+                                Row(
+                                  children: [
+                                    OutlinedButton.icon(
+                                      onPressed: () async {
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const EditProfileScreen(),
+                                          ),
+                                        );
+                                        if (mounted) setState(() {});
+                                      },
+                                      icon: const Icon(Icons.edit, size: 14),
+                                      label: Text(
+                                        appLocalization.t(
+                                            AppStrings.editProfile),
+                                        style: const TextStyle(fontSize: 12),
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: ColorPalette.primary,
+                                        side: BorderSide(
+                                            color: ColorPalette.primary),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    ElevatedButton.icon(
+                                      onPressed: () async {
+                                        await _firebaseAuth.signOut();
+                                        if (mounted) setState(() {});
+                                      },
+                                      icon: const Icon(Icons.logout, size: 14),
+                                      label: const Text(
+                                        'Logout',
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.red,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                child: Text(
-                                  appLocalization.t(AppStrings.editProfile),
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                              ),
                             ],
                           ),
                         ),
@@ -121,19 +192,21 @@ class _SettingsPageState extends State<SettingsPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '🕌 ${appLocalization.t(AppStrings.masjidSettings)}',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    appLocalization.t(AppStrings.masjidSettings),
+                    style:
+                        Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
                   ),
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       border: Border.all(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? ColorPalette.darkBorder
-                            : ColorPalette.lightBorder,
+                        color:
+                            Theme.of(context).brightness == Brightness.dark
+                                ? ColorPalette.darkBorder
+                                : ColorPalette.lightBorder,
                       ),
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -150,7 +223,8 @@ class _SettingsPageState extends State<SettingsPage> {
                         const SizedBox(height: 6),
                         Text(
                           AppData.selectedMasjid?.name ??
-                              appLocalization.t(AppStrings.selectMasjid),
+                              appLocalization
+                                  .t(AppStrings.selectMasjid),
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
@@ -159,7 +233,8 @@ class _SettingsPageState extends State<SettingsPage> {
                         const SizedBox(height: 8),
                         Text(
                           AppData.selectedMasjid?.location ??
-                              appLocalization.t(AppStrings.selectMasjid),
+                              appLocalization
+                                  .t(AppStrings.selectMasjid),
                           style: TextStyle(
                             fontSize: 12,
                             color: ColorPalette.lightTextSecondary,
@@ -173,13 +248,15 @@ class _SettingsPageState extends State<SettingsPage> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => const MasjidSelectionScreen(),
+                                  builder: (_) =>
+                                      const MasjidSelectionScreen(),
                                 ),
                               );
                             },
                             icon: const Icon(Icons.location_on),
                             label: Text(
-                              appLocalization.t(AppStrings.changeMasjid),
+                              appLocalization
+                                  .t(AppStrings.changeMasjid),
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: ColorPalette.secondary,
@@ -201,64 +278,74 @@ class _SettingsPageState extends State<SettingsPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '⚙️ ${appLocalization.t(AppStrings.preferences)}',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    appLocalization.t(AppStrings.preferences),
+                    style:
+                        Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
                   ),
                   const SizedBox(height: 12),
-                  Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? ColorPalette.darkBorder
-                            : ColorPalette.lightBorder,
-                      ),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      children: [
-                        _SettingsTile(
-                          icon: Icons.dark_mode,
-                          title: appLocalization.t(AppStrings.darkMode),
-                          trailing: Switch(
-                            value: appStateProvider.isDarkMode,
-                            onChanged: (value) {
-                              appStateProvider.toggleDarkMode();
-                            },
+                  Builder(
+                    builder: (context) {
+                      final settings = context.watch<SettingsProvider>();
+                      return Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Theme.of(context).brightness ==
+                                    Brightness.dark
+                                ? ColorPalette.darkBorder
+                                : ColorPalette.lightBorder,
                           ),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        Divider(
-                          height: 1,
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? ColorPalette.darkBorder
-                              : ColorPalette.lightBorder,
+                        child: Column(
+                          children: [
+                            _SettingsTile(
+                              icon: Icons.dark_mode,
+                              title: appLocalization
+                                  .t(AppStrings.darkMode),
+                              trailing: Switch(
+                                value: settings.isDarkMode,
+                                onChanged: (_) =>
+                                    settings.toggleDarkMode(),
+                              ),
+                            ),
+                            Divider(
+                              height: 1,
+                              color: Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? ColorPalette.darkBorder
+                                  : ColorPalette.lightBorder,
+                            ),
+                            _SettingsTile(
+                              icon: Icons.notifications,
+                              title: appLocalization
+                                  .t(AppStrings.notifications),
+                              trailing: Switch(
+                                value: settings.notificationsEnabled,
+                                onChanged: (_) =>
+                                    settings.toggleNotifications(),
+                              ),
+                            ),
+                            Divider(
+                              height: 1,
+                              color: Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? ColorPalette.darkBorder
+                                  : ColorPalette.lightBorder,
+                            ),
+                            _LanguageTile(
+                              icon: Icons.language,
+                              title: appLocalization
+                                  .t(AppStrings.language),
+                              onLanguageChanged: () {
+                                setState(() {});
+                              },
+                            ),
+                          ],
                         ),
-                        _SettingsTile(
-                          icon: Icons.notifications,
-                          title: appLocalization.t(AppStrings.notifications),
-                          trailing: Switch(
-                            value: _notificationsEnabled,
-                            onChanged: (value) {
-                              setState(() => _notificationsEnabled = value);
-                            },
-                          ),
-                        ),
-                        Divider(
-                          height: 1,
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? ColorPalette.darkBorder
-                              : ColorPalette.lightBorder,
-                        ),
-                        _LanguageTile(
-                          icon: Icons.language,
-                          title: appLocalization.t(AppStrings.language),
-                          onLanguageChanged: () {
-                            setState(() {});
-                          },
-                        ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -272,10 +359,11 @@ class _SettingsPageState extends State<SettingsPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '🔐 ${appLocalization.t(AppStrings.adminPanel)}',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    appLocalization.t(AppStrings.adminPanel),
+                    style:
+                        Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
@@ -290,10 +378,12 @@ class _SettingsPageState extends State<SettingsPage> {
                         );
                       },
                       icon: const Icon(Icons.admin_panel_settings),
-                      label: Text(appLocalization.t(AppStrings.adminPanel)),
+                      label:
+                          Text(appLocalization.t(AppStrings.adminPanel)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: ColorPalette.tertiary,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 12),
                       ),
                     ),
                   ),
@@ -309,10 +399,11 @@ class _SettingsPageState extends State<SettingsPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'ℹ️ ${appLocalization.t(AppStrings.about)}',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    appLocalization.t(AppStrings.about),
+                    style:
+                        Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
                   ),
                   const SizedBox(height: 12),
                   Container(
@@ -328,16 +419,23 @@ class _SettingsPageState extends State<SettingsPage> {
                           subtitle: 'v1.0.0',
                           onTap: () {},
                         ),
-                        Divider(height: 1, color: ColorPalette.lightBorder),
+                        Divider(
+                          height: 1,
+                          color: ColorPalette.lightBorder,
+                        ),
                         _SettingsTile(
                           icon: Icons.help,
                           title: appLocalization.t(AppStrings.help),
                           onTap: () {},
                         ),
-                        Divider(height: 1, color: ColorPalette.lightBorder),
+                        Divider(
+                          height: 1,
+                          color: ColorPalette.lightBorder,
+                        ),
                         _SettingsTile(
                           icon: Icons.privacy_tip,
-                          title: appLocalization.t(AppStrings.privacyPolicy),
+                          title: appLocalization
+                              .t(AppStrings.privacyPolicy),
                           onTap: () {},
                         ),
                       ],
@@ -376,8 +474,7 @@ class _SettingsTile extends StatelessWidget {
       leading: Icon(icon, color: ColorPalette.primary),
       title: Text(title),
       subtitle: subtitle != null ? Text(subtitle!) : null,
-      trailing:
-          trailing ??
+      trailing: trailing ??
           Icon(Icons.chevron_right, color: ColorPalette.lightTextSecondary),
       onTap: onTap,
     );
@@ -398,7 +495,8 @@ class _LanguageTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currentLanguage = appLocalization.locale == 'en'
+    final settings = context.watch<SettingsProvider>();
+    final currentLanguage = settings.locale == 'en'
         ? appLocalization.t(AppStrings.english)
         : appLocalization.t(AppStrings.urdu);
 
@@ -408,7 +506,6 @@ class _LanguageTile extends StatelessWidget {
       subtitle: Text(currentLanguage),
       trailing: GestureDetector(
         onTap: () async {
-          // Show language selection dialog
           final selected = await showDialog<String>(
             context: context,
             builder: (context) => AlertDialog(
@@ -417,28 +514,28 @@ class _LanguageTile extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   ListTile(
-                    title: Text(appLocalization.t(AppStrings.english)),
+                    title:
+                        Text(appLocalization.t(AppStrings.english)),
                     onTap: () => Navigator.pop(context, 'en'),
-                    selected: appLocalization.locale == 'en',
-                    selectedTileColor: ColorPalette.primary.withValues(
-                      alpha: 0.2,
-                    ),
+                    selected: settings.locale == 'en',
+                    selectedTileColor: ColorPalette.primary
+                        .withValues(alpha: 0.2),
                   ),
                   ListTile(
-                    title: Text(appLocalization.t(AppStrings.urdu)),
+                    title:
+                        Text(appLocalization.t(AppStrings.urdu)),
                     onTap: () => Navigator.pop(context, 'ur'),
-                    selected: appLocalization.locale == 'ur',
-                    selectedTileColor: ColorPalette.primary.withValues(
-                      alpha: 0.2,
-                    ),
+                    selected: settings.locale == 'ur',
+                    selectedTileColor: ColorPalette.primary
+                        .withValues(alpha: 0.2),
                   ),
                 ],
               ),
             ),
           );
 
-          if (selected != null && selected != appLocalization.locale) {
-            await appLocalization.setLanguage(selected);
+          if (selected != null && selected != settings.locale) {
+            await settings.setLanguage(selected);
             onLanguageChanged?.call();
           }
         },

@@ -39,7 +39,8 @@ dependencies:
   firebase_core: ^3.5.0
   cloud_firestore: ^5.4.0
   firebase_auth: ^5.3.0
-  
+  google_sign_in: ^6.2.1
+
   # Local storage
   shared_preferences: ^2.3.2
   
@@ -48,13 +49,12 @@ dependencies:
   
   # Google Fonts for beautiful typography
   google_fonts: ^6.0.0
-  
+
+  # State management
+  provider: ^6.1.2
+
   # Location services
   geolocator: ^10.1.0
-  location: ^5.0.1
-  
-  # HTTP for potential API calls
-  http: ^1.1.0
 
 dev_dependencies:
   flutter_test:

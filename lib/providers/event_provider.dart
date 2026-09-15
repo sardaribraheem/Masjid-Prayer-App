@@ -1,0 +1,76 @@
+import 'package:flutter/material.dart';
+import '../models/app_data.dart';
+import '../repositories/event_repository.dart';
+
+/// ChangeNotifier provider for events data.
+/// Wraps EventRepository and provides reactive state for the UI.
+class EventProvider extends ChangeNotifier {
+  final EventRepository _repository = EventRepository();
+
+  List<Event> _events = [];
+  bool _isLoading = false;
+  String? _error;
+
+  List<Event> get events => _events;
+  bool get isLoading => _isLoading;
+  String? get error => _error;
+
+  /// Get events filtered by masjid ID
+  List<Event> getEventsByMasjid(String masjidId) {
+    return _events.where((e) => e.masjidId == masjidId).toList();
+  }
+
+  /// Load events from Firestore for a specific masjid
+  Future<void> loadEvents(String masjidId) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      _events = await _repository.getEvents(masjidId);
+      _error = null;
+    } catch (e) {
+      _error = e.toString();
+    }
+
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  /// Listen to real-time updates for events
+  void subscribeToEvents(String masjidId) {
+    _repository.getEventsStream(masjidId).listen((events) {
+      _events = events;
+      notifyListeners();
+    });
+  }
+
+  /// Add a new event
+  Future<bool> addEvent(Event event) async {
+    final success = await _repository.addEvent(event);
+    if (success) {
+      // Also sync to AppData for backward compatibility
+      AppData.allEvents.add(event);
+      notifyListeners();
+    }
+    return success;
+  }
+
+  /// Update an existing event
+  Future<bool> updateEvent(String masjidId, Event event) async {
+    final success = await _repository.updateEvent(masjidId, event);
+    if (success) {
+      notifyListeners();
+    }
+    return success;
+  }
+
+  /// Delete an event
+  Future<bool> deleteEvent(String masjidId, String eventId) async {
+    final success = await _repository.deleteEvent(masjidId, eventId);
+    if (success) {
+      _events.removeWhere((e) => e.id == eventId);
+      notifyListeners();
+    }
+    return success;
+  }
+}

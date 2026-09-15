@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/app_data.dart';
+import '../providers/question_provider.dart';
 import '../l10n/app_localization.dart';
 import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
@@ -25,7 +27,7 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
   }
 
   /// Validate and submit the question
-  void _submitQuestion() {
+  Future<void> _submitQuestion() async {
     // Validation
     if (_nameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -45,33 +47,56 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
       return;
     }
 
+    final masjidId = AppData.selectedMasjid?.id ?? '';
+    if (masjidId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(appLocalization.t(AppStrings.noMasjidSelected2)),
+        ),
+      );
+      return;
+    }
+
     // Submit the question
     setState(() => _isSubmitting = true);
 
     try {
-      AppData.addQuestion(
-        _nameController.text.trim(),
-        _questionController.text.trim(),
-        AppData.selectedMasjid?.id ?? 'unknown',
-      );
+      final success = await context.read<QuestionProvider>().addQuestion(
+            userName: _nameController.text.trim(),
+            questionText: _questionController.text.trim(),
+            masjidId: masjidId,
+          );
 
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(appLocalization.t(AppStrings.questionSubmitted)),
-          backgroundColor: ColorPalette.success,
-        ),
-      );
+      if (!mounted) return;
 
-      // Clear the form
-      _nameController.clear();
-      _questionController.clear();
+      if (success) {
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(appLocalization.t(AppStrings.questionSubmitted)),
+            backgroundColor: ColorPalette.success,
+          ),
+        );
 
-      // Go back
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) Navigator.pop(context);
-      });
+        // Clear the form
+        _nameController.clear();
+        _questionController.clear();
+
+        // Go back
+        Future.delayed(const Duration(seconds: 1), () {
+          if (mounted) Navigator.pop(context);
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${appLocalization.t(AppStrings.error)}: ${appLocalization.t(AppStrings.errorOccurredMsg)}',
+            ),
+          ),
+        );
+      }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -80,7 +105,9 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
         ),
       );
     } finally {
-      setState(() => _isSubmitting = false);
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
 
@@ -100,7 +127,7 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
             children: [
               // Header
               Text(
-                '📝 ${appLocalization.t(AppStrings.submitQuestion)}',
+                appLocalization.t(AppStrings.submitQuestion),
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   color: ColorPalette.primary,
                   fontWeight: FontWeight.bold,

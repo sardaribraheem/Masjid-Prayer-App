@@ -114,7 +114,6 @@ class Masjid {
   String name;
   String location;
   String username; // For admin login
-  String password; // For admin login
   List<PrayerTime> prayerTimes;
   String? jummahTime; // Optional Jummah time
   DateTime? lastUpdated;
@@ -126,8 +125,7 @@ class Masjid {
     this.id = '',
     required this.name,
     required this.location,
-    required this.username,
-    required this.password,
+    this.username = '',
     required this.prayerTimes,
     this.jummahTime,
     this.lastUpdated,
@@ -142,7 +140,6 @@ class Masjid {
       'name': name,
       'location': location,
       'username': username,
-      'password': password,
       'prayerTimes': prayerTimes.map((p) => p.toJson()).toList(),
       'jummah': jummahTime,
       'lastUpdated': lastUpdated ?? DateTime.now(),
@@ -163,7 +160,6 @@ class Masjid {
       name: data['name'] as String? ?? '',
       location: data['location'] as String? ?? '',
       username: data['username'] as String? ?? '',
-      password: data['password'] as String? ?? '',
       prayerTimes: prayerTimes,
       jummahTime: data['jummah'] as String?,
       lastUpdated: data['lastUpdated'] is DateTime
@@ -310,7 +306,6 @@ class AppData {
         name: 'Central Masjid',
         location: 'Downtown',
         username: 'admin1',
-        password: 'pass123',
         prayerTimes: [
           PrayerTime(name: 'Fajr', time: '5:30 AM'),
           PrayerTime(name: 'Dhuhr', time: '12:45 PM'),
@@ -325,7 +320,6 @@ class AppData {
         name: 'New Mosque',
         location: 'Uptown',
         username: 'admin2',
-        password: 'pass456',
         prayerTimes: [
           PrayerTime(name: 'Fajr', time: '5:25 AM'),
           PrayerTime(name: 'Dhuhr', time: '12:50 PM'),
@@ -340,7 +334,6 @@ class AppData {
         name: 'Green Valley Mosque',
         location: 'Eastside',
         username: 'admin3',
-        password: 'pass789',
         prayerTimes: [
           PrayerTime(name: 'Fajr', time: '5:35 AM'),
           PrayerTime(name: 'Dhuhr', time: '12:40 PM'),

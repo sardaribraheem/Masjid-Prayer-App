@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart' as auth;
+import 'package:provider/provider.dart';
 import '../models/app_data.dart';
+import '../providers/auth_provider.dart';
 import '../services/firebase_service.dart';
 import '../services/storage_service.dart';
 import '../l10n/app_localization.dart';
@@ -8,8 +11,8 @@ import '../theme/app_theme.dart';
 import 'admin_panel_screen.dart';
 import 'admin_register_screen.dart';
 
-/// Admin login screen
-/// Admins/Imams can log in here to edit prayer times
+/// Admin login screen using Firebase Auth (Email/Password)
+/// Admins/Imams can log in here to manage their masjid
 class AdminLoginScreen extends StatefulWidget {
   const AdminLoginScreen({super.key});
 
@@ -18,28 +21,27 @@ class AdminLoginScreen extends StatefulWidget {
 }
 
 class _AdminLoginScreenState extends State<AdminLoginScreen> {
-  // Controllers to get text from input fields
-  final usernameController = TextEditingController();
+  final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final FirebaseService _firebaseService = FirebaseService();
   final StorageService _storageService = StorageService();
-  String? errorMessage; // Show error if login fails
-  bool isLoading = false; // Show loading indicator
+  final auth.FirebaseAuth _firebaseAuth = auth.FirebaseAuth.instance;
+  String? errorMessage;
+  bool isLoading = false;
 
   @override
   void dispose() {
-    // Clean up when we're done with this screen
-    usernameController.dispose();
+    emailController.dispose();
     passwordController.dispose();
     super.dispose();
   }
 
-  /// Authenticate admin against Firestore
+  /// Authenticate admin using Firebase Auth
   Future<void> handleLogin() async {
-    final username = usernameController.text.trim();
+    final email = emailController.text.trim();
     final password = passwordController.text;
 
-    if (username.isEmpty || password.isEmpty) {
+    if (email.isEmpty || password.isEmpty) {
       setState(() {
         errorMessage = appLocalization.t(
           AppStrings.pleaseEnterUsernameAndPassword,
@@ -54,36 +56,29 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     });
 
     try {
-      // Try to authenticate against Firestore
-      final masjid = await _firebaseService.authenticateAdmin(
-        username,
-        password,
+      // Sign in with Firebase Auth
+      final credential = await _firebaseAuth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
       );
 
-      if (masjid != null) {
-        // Login successful! Save the login state and go to Admin Panel
-        await _storageService.saveAdminLoginStatus(masjid.id, username);
-        AppData.selectedMasjid = masjid;
-        AppData.selectedMasjidId = masjid.id;
-
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const AdminPanelScreen()),
-          );
-        }
-      } else {
-        // Try fallback to local data for testing
+      if (credential.user != null) {
+        // Find the masjid associated with this admin
+        final masjids = await _firebaseService.getAllMasjids();
         Masjid? foundMasjid;
-        for (var masjid in AppData.allMasjids) {
-          if (masjid.username == username && masjid.password == password) {
+
+        for (var masjid in masjids) {
+          if (masjid.username == email) {
             foundMasjid = masjid;
             break;
           }
         }
 
         if (foundMasjid != null) {
-          await _storageService.saveAdminLoginStatus(foundMasjid.id, username);
+          await _storageService.saveAdminLoginStatus(
+            foundMasjid.id,
+            email,
+          );
           AppData.selectedMasjid = foundMasjid;
           AppData.selectedMasjidId = foundMasjid.id;
 
@@ -94,13 +89,48 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
             );
           }
         } else {
-          setState(() {
-            errorMessage = appLocalization.t(
-              AppStrings.invalidUsernameOrPassword,
+          // Also check local data
+          Masjid? localMasjid;
+          for (var masjid in AppData.allMasjids) {
+            if (masjid.username == email) {
+              localMasjid = masjid;
+              break;
+            }
+          }
+
+          if (localMasjid != null) {
+            await _storageService.saveAdminLoginStatus(
+              localMasjid.id,
+              email,
             );
-          });
+            AppData.selectedMasjid = localMasjid;
+            AppData.selectedMasjidId = localMasjid.id;
+
+            if (mounted) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AdminPanelScreen()),
+              );
+            }
+          } else {
+            setState(() {
+              errorMessage = appLocalization.t(
+                AppStrings.invalidUsernameOrPassword,
+              );
+            });
+          }
         }
       }
+    } on auth.FirebaseAuthException catch (e) {
+      setState(() {
+        if (e.code == 'user-not-found') {
+          errorMessage = appLocalization.t(AppStrings.invalidUsernameOrPassword);
+        } else if (e.code == 'wrong-password') {
+          errorMessage = appLocalization.t(AppStrings.invalidUsernameOrPassword);
+        } else {
+          errorMessage = e.message ?? 'Login failed';
+        }
+      });
     } catch (e) {
       setState(() {
         errorMessage = 'Login error: $e';
@@ -137,19 +167,25 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              const SizedBox(height: 8),
+              Text(
+                'Sign in with your email and password',
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              ),
               const SizedBox(height: 30),
 
-              // Username field
+              // Email field
               TextField(
-                controller: usernameController,
+                controller: emailController,
                 enabled: !isLoading,
+                keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
-                  labelText: appLocalization.t(AppStrings.username),
-                  hintText: appLocalization.t(AppStrings.enterYourUsername),
+                  labelText: 'Email',
+                  hintText: 'admin@masjid.com',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  prefixIcon: const Icon(Icons.person),
+                  prefixIcon: const Icon(Icons.email),
                 ),
               ),
               const SizedBox(height: 16),
@@ -158,7 +194,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
               TextField(
                 controller: passwordController,
                 enabled: !isLoading,
-                obscureText: true, // Hide the password
+                obscureText: true,
                 decoration: InputDecoration(
                   labelText: appLocalization.t(AppStrings.password),
                   hintText: appLocalization.t(AppStrings.enterYourPassword),
@@ -185,7 +221,10 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                     ),
                     child: Text(
                       errorMessage!,
-                      style: TextStyle(color: ColorPalette.error, fontSize: 14),
+                      style: TextStyle(
+                        color: ColorPalette.error,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
                 ),
@@ -218,6 +257,40 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Google Sign-In button
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: isLoading ? null : () async {
+                    final authProvider = context.read<AuthProvider>();
+                    final success = await authProvider.signInWithGoogle();
+                    if (!mounted) return;
+                    if (success) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const AdminPanelScreen()),
+                      );
+                    } else if (authProvider.error != null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(authProvider.error!),
+                          backgroundColor: ColorPalette.error,
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.login, color: Colors.black54),
+                  label: const Text('Sign in with Google'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.black87,
+                    side: const BorderSide(color: Colors.grey),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),

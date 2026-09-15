@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 /// Search Bar Widget for Community Page
 /// Allows filtering events by title, description, and masjid name
@@ -36,17 +37,13 @@ class _EventSearchBarState extends State<EventSearchBar> {
 
   @override
   Widget build(BuildContext context) {
-    const Color deepEmerald = Color(0xFF1B5E47);
-    const Color softCream = Color(0xFFFAF7F2);
-    const Color brushGold = Color(0xFFD4A574);
-
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: deepEmerald.withOpacity(0.1),
+            color: ColorPalette.primary.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -58,12 +55,12 @@ class _EventSearchBarState extends State<EventSearchBar> {
         decoration: InputDecoration(
           hintText: widget.hintText,
           hintStyle: TextStyle(
-            color: Colors.grey[400],
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
             fontSize: 14,
           ),
           prefixIcon: Icon(
             Icons.search,
-            color: brushGold,
+            color: ColorPalette.secondary,
             size: 20,
           ),
           suffixIcon: _controller.text.isNotEmpty
@@ -74,14 +71,14 @@ class _EventSearchBarState extends State<EventSearchBar> {
                   },
                   child: Icon(
                     Icons.close,
-                    color: brushGold,
+                    color: ColorPalette.secondary,
                     size: 20,
                   ),
                 )
               : null,
           border: InputBorder.none,
           filled: true,
-          fillColor: softCream,
+          fillColor: Theme.of(context).scaffoldBackgroundColor,
           contentPadding: const EdgeInsets.symmetric(vertical: 14),
           isDense: true,
         ),

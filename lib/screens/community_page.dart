@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/app_data.dart';
+import '../providers/event_provider.dart';
 import '../widgets/event_search_bar.dart';
 import '../widgets/category_slider.dart';
 import '../widgets/enhanced_event_card.dart';
+import '../widgets/shared/empty_state.dart';
 import '../l10n/app_localization.dart';
 import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
@@ -20,6 +23,19 @@ class _CommunityPageState extends State<CommunityPage> {
   String _selectedCategory = 'all'; // Category filter
   String _searchQuery = ''; // Search query
 
+  @override
+  void initState() {
+    super.initState();
+    _loadEvents();
+  }
+
+  Future<void> _loadEvents() async {
+    final masjidId = AppData.selectedMasjid?.id ?? '';
+    if (masjidId.isNotEmpty) {
+      await context.read<EventProvider>().loadEvents(masjidId);
+    }
+  }
+
   /// Get category definitions with localized labels
   List<CategoryItem> _getCategories() {
     return [
@@ -36,18 +52,19 @@ class _CommunityPageState extends State<CommunityPage> {
   }
 
   List<Event> _getFilteredEvents() {
-    // Start with base events based on filter type
-    List<Event> events;
+    final masjidId = AppData.selectedMasjid?.id ?? '';
+    final provider = context.watch<EventProvider>();
+    List<Event> events = provider.getEventsByMasjid(masjidId);
 
-    if (_filterType == 'upcoming') {
-      events = AppData.getUpcomingEvents();
-    } else if (_filterType == 'nearby') {
-      events = AppData.getEventsSortedByDistance();
-    } else {
-      events = AppData.allEvents
-          .toList()
-          .reversed
-          .toList(); // All events, newest first
+    // Fall back to AppData if provider has no events
+    if (events.isEmpty && AppData.allEvents.isNotEmpty) {
+      if (_filterType == 'upcoming') {
+        events = AppData.getUpcomingEvents();
+      } else if (_filterType == 'nearby') {
+        events = AppData.getEventsSortedByDistance();
+      } else {
+        events = AppData.allEvents.toList().reversed.toList();
+      }
     }
 
     // Apply category filter
@@ -76,6 +93,11 @@ class _CommunityPageState extends State<CommunityPage> {
 
   @override
   Widget build(BuildContext context) {
+    final masjidId = AppData.selectedMasjid?.id ?? '';
+    if (masjidId.isNotEmpty) {
+      context.read<EventProvider>().subscribeToEvents(masjidId);
+    }
+
     final filteredEvents = _getFilteredEvents();
 
     return Scaffold(
@@ -103,7 +125,7 @@ class _CommunityPageState extends State<CommunityPage> {
             categories: _getCategories(),
           ),
 
-          // Filter Tabs (existing filter buttons)
+          // Filter Tabs
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: SingleChildScrollView(
@@ -111,13 +133,13 @@ class _CommunityPageState extends State<CommunityPage> {
               child: Row(
                 children: [
                   _FilterButton(
-                    label: '📅 ${appLocalization.t(AppStrings.upcoming)}',
+                    label: appLocalization.t(AppStrings.upcoming),
                     isSelected: _filterType == 'upcoming',
                     onTap: () => setState(() => _filterType = 'upcoming'),
                   ),
                   const SizedBox(width: 10),
                   _FilterButton(
-                    label: '📍 ${appLocalization.t(AppStrings.nearby)}',
+                    label: appLocalization.t(AppStrings.nearby),
                     isSelected: _filterType == 'nearby',
                     onTap: () => setState(() => _filterType = 'nearby'),
                   ),
@@ -134,35 +156,28 @@ class _CommunityPageState extends State<CommunityPage> {
 
           // Events List
           Expanded(
-            child: filteredEvents.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.event_outlined,
-                          size: 64,
-                          color: ColorPalette.lightTextSecondary,
+            child: context.watch<EventProvider>().isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : filteredEvents.isEmpty
+                    ? EmptyState(
+                        icon: Icons.event_outlined,
+                        title: appLocalization.t(AppStrings.noEvents),
+                        subtitle: appLocalization.t(AppStrings.eventsWillAppearHere),
+                        actionLabel: appLocalization.t(AppStrings.refresh),
+                        onAction: _loadEvents,
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _loadEvents,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.only(bottom: 20, top: 8),
+                          itemCount: filteredEvents.length,
+                          itemBuilder: (context, index) {
+                            return EnhancedEventCard(
+                              event: filteredEvents[index],
+                            );
+                          },
                         ),
-                        const SizedBox(height: 12),
-                        Text(
-                          appLocalization.t(AppStrings.noEvents),
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: ColorPalette.lightTextSecondary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.only(bottom: 20, top: 8),
-                    itemCount: filteredEvents.length,
-                    itemBuilder: (context, index) {
-                      return EnhancedEventCard(event: filteredEvents[index]);
-                    },
-                  ),
+                      ),
           ),
         ],
       ),
@@ -189,13 +204,17 @@ class _FilterButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.green[700] : Colors.grey[200],
+          color: isSelected
+              ? ColorPalette.primary
+              : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : Colors.grey[600],
+            color: isSelected
+                ? Theme.of(context).colorScheme.onPrimary
+                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             fontSize: 12,
           ),

@@ -251,7 +251,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Material(
         borderRadius: BorderRadius.circular(20),
-        color: Colors.white.withOpacity(0.9),
+        color: Colors.white.withValues(alpha: 0.9),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Row(
@@ -348,7 +348,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             style: GoogleFonts.poppins(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -374,7 +374,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     vertical: 12,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.25),
+                    color: Colors.white.withValues(alpha: 0.25),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -392,7 +392,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: GoogleFonts.poppins(
                     fontSize: 12,
                     fontWeight: FontWeight.w400,
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withValues(alpha: 0.8),
                   ),
                 ),
               ],
@@ -432,7 +432,7 @@ class _HomeScreenState extends State<HomeScreen> {
   ) {
     final cardColor = isNext
         ? ColorPalette.primary.withValues(alpha: 0.08)
-        : const Color.fromRGBO(255, 255, 255, 1).withOpacity(0.7);
+        : const Color.fromRGBO(255, 255, 255, 1).withValues(alpha: 0.7);
 
     return Container(
       decoration: BoxDecoration(
@@ -564,7 +564,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Icon(icon, color: color, size: size),

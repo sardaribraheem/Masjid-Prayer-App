@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:provider/provider.dart';
 import '../models/app_data.dart';
-import '../services/firebase_service.dart';
-import '../services/storage_service.dart';
-import '../services/location_service.dart';
+import '../providers/masjid_provider.dart';
+import '../providers/location_provider.dart';
 import '../l10n/app_localization.dart';
 import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
-import 'admin_login_screen.dart';
 import 'main_navigation_screen.dart';
 
 /// Screen for location-based masjid selection with distance sorting
@@ -20,124 +18,36 @@ class MasjidSelectionScreen extends StatefulWidget {
 }
 
 class _MasjidSelectionScreenState extends State<MasjidSelectionScreen> {
-  final FirebaseService _firebaseService = FirebaseService();
-  final StorageService _storageService = StorageService();
-  final LocationService _locationService = LocationService();
-  final TextEditingController _searchController = TextEditingController();
-
-  // Islamic Design Colors
-  static const Color deepEmerald = Color(0xFF1B5E47);
-  static const Color softCream = Color(0xFFFAF7F2);
-  static const Color brushGold = Color(0xFFD4A574);
-
-  Position? _userPosition;
-  List<Masjid> _allMasjids = [];
-  List<Masjid> _filteredMasjids = [];
-  bool _isLoadingLocation = false;
-  bool _isLoadingMasjids = false;
-  String? _errorMessage;
-
   @override
   void initState() {
     super.initState();
     _initializeLocationAndMasjids();
-    _searchController.addListener(_filterMasjids);
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 
   /// Initialize location and fetch nearby masjids
   Future<void> _initializeLocationAndMasjids() async {
-    setState(() {
-      _isLoadingLocation = true;
-      _errorMessage = null;
-    });
+    final locationProvider = context.read<LocationProvider>();
+    final masjidProvider = context.read<MasjidProvider>();
 
-    try {
-      // Request location permission
-      final hasPermission = await _locationService.requestLocationPermission();
-      if (!hasPermission) {
-        setState(() {
-          _errorMessage = appLocalization.t(
-            AppStrings.locationPermissionRequired,
-          );
-          _isLoadingLocation = false;
-        });
-        return;
-      }
+    // Try to get location first
+    final hasLocation = await locationProvider.requestLocation();
 
-      // Get user location
-      final position = await _locationService.getUserLocation();
-      if (position == null) {
-        setState(() {
-          _errorMessage = appLocalization.t(AppStrings.unableToGetYourLocation);
-          _isLoadingLocation = false;
-        });
-        return;
-      }
-
-      setState(() {
-        _userPosition = position;
-        _isLoadingLocation = false;
-        _isLoadingMasjids = true;
-      });
-
-      // Fetch masjids sorted by distance
-      final masjids = await _firebaseService.getMasjidsSortedByDistance(
-        position.latitude,
-        position.longitude,
+    if (hasLocation) {
+      await masjidProvider.loadMasjidsWithLocation(
+        locationProvider.latitude!,
+        locationProvider.longitude!,
       );
-
-      setState(() {
-        _allMasjids = masjids;
-        _filteredMasjids = masjids;
-        _isLoadingMasjids = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage =
-            '${appLocalization.t(AppStrings.errorOccurredMsg)}: ${e.toString()}';
-        _isLoadingLocation = false;
-        _isLoadingMasjids = false;
-      });
-    }
-  }
-
-  /// Filter masjids based on search query
-  void _filterMasjids() {
-    final query = _searchController.text.toLowerCase();
-
-    if (query.isEmpty) {
-      setState(() {
-        _filteredMasjids = _allMasjids;
-      });
     } else {
-      setState(() {
-        _filteredMasjids = _allMasjids
-            .where(
-              (masjid) =>
-                  masjid.name.toLowerCase().contains(query) ||
-                  masjid.location.toLowerCase().contains(query),
-            )
-            .toList();
-      });
+      await masjidProvider.loadMasjids();
     }
   }
 
   /// Handle masjid selection
   Future<void> _selectMasjid(Masjid masjid) async {
-    // Save selection locally
-    await _storageService.saveSelectedMasjidId(masjid.id);
+    final masjidProvider = context.read<MasjidProvider>();
+    await masjidProvider.selectMasjid(masjid);
 
-    // Update app data
-    AppData.selectedMasjid = masjid;
-    AppData.selectedMasjidId = masjid.id;
-
-    // Navigate to main navigation (bottom nav bar)
+    // Navigate to main navigation
     if (mounted) {
       Navigator.pushReplacement(
         context,
@@ -157,6 +67,9 @@ class _MasjidSelectionScreenState extends State<MasjidSelectionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final masjidProvider = context.watch<MasjidProvider>();
+    final locationProvider = context.watch<LocationProvider>();
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -164,7 +77,7 @@ class _MasjidSelectionScreenState extends State<MasjidSelectionScreen> {
           style: GoogleFonts.poppins(
             fontSize: 22,
             fontWeight: FontWeight.w600,
-            color: softCream,
+            color: ColorPalette.lightBg,
           ),
         ),
         elevation: 0,
@@ -174,7 +87,10 @@ class _MasjidSelectionScreenState extends State<MasjidSelectionScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [softCream, softCream.withOpacity(0.92)],
+            colors: [
+              Theme.of(context).colorScheme.surface,
+              Theme.of(context).colorScheme.surface.withValues(alpha: 0.92),
+            ],
           ),
         ),
         child: Column(
@@ -182,17 +98,17 @@ class _MasjidSelectionScreenState extends State<MasjidSelectionScreen> {
             // Search Bar
             Padding(
               padding: const EdgeInsets.all(16.0),
-              child: _buildSearchBar(),
+              child: _buildSearchBar(masjidProvider),
             ),
 
             // Location Status
-            if (_userPosition == null && _isLoadingLocation)
+            if (locationProvider.isLoading || (masjidProvider.isLoading && masjidProvider.allMasjids.isEmpty))
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: _buildLocationLoadingWidget(),
               ),
 
-            if (_errorMessage != null)
+            if (masjidProvider.error != null && masjidProvider.allMasjids.isEmpty)
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: _buildErrorWidget(),
@@ -200,78 +116,52 @@ class _MasjidSelectionScreenState extends State<MasjidSelectionScreen> {
 
             // Masjid List or Loading
             Expanded(
-              child: _isLoadingMasjids
+              child: masjidProvider.isLoading && masjidProvider.allMasjids.isEmpty
                   ? const Center(
                       child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(deepEmerald),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          ColorPalette.primary,
+                        ),
                       ),
                     )
-                  : _filteredMasjids.isEmpty
-                  ? _buildEmptyStateWidget()
-                  : _buildMasjidsList(),
+                  : masjidProvider.filteredMasjids.isEmpty
+                      ? _buildEmptyStateWidget()
+                      : RefreshIndicator(
+                          onRefresh: _initializeLocationAndMasjids,
+                          child: _buildMasjidsList(masjidProvider),
+                        ),
             ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        icon: const Icon(Icons.admin_panel_settings),
-        label: Text(appLocalization.t(AppStrings.adminImmam)),
-        backgroundColor: ColorPalette.primary,
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const AdminLoginScreen()),
-          );
-        },
       ),
     );
   }
 
   /// Build search bar widget
-  Widget _buildSearchBar() {
+  Widget _buildSearchBar(MasjidProvider provider) {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: deepEmerald.withOpacity(0.1),
+            color: ColorPalette.primary.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
       ),
       child: TextField(
-        controller: _searchController,
+        onChanged: (value) => provider.searchQuery = value,
         style: GoogleFonts.poppins(fontSize: 16),
         decoration: InputDecoration(
           hintText: appLocalization.t(AppStrings.searchMasjidByName),
           hintStyle: GoogleFonts.poppins(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.grey.shade500
-                : Colors.grey.shade400,
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
           ),
-          prefixIcon: Icon(
-            Icons.search,
-            color: brushGold,
-          ),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? GestureDetector(
-                  onTap: () {
-                    _searchController.clear();
-                  },
-                  child: Icon(
-                    Icons.clear,
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.grey.shade500
-                        : Colors.grey.shade400,
-                  ),
-                )
-              : null,
+          prefixIcon: const Icon(Icons.search, color: Color(0xFFD4A574)),
           border: InputBorder.none,
           filled: true,
-          fillColor: Theme.of(context).brightness == Brightness.dark
-              ? ColorPalette.darkCardBg
-              : Colors.white,
+          fillColor: Theme.of(context).colorScheme.surface,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
             vertical: 12,
@@ -282,10 +172,9 @@ class _MasjidSelectionScreenState extends State<MasjidSelectionScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: brushGold, width: 2),
+            borderSide: const BorderSide(color: Color(0xFFD4A574), width: 2),
           ),
         ),
-        onChanged: (_) => setState(() {}),
       ),
     );
   }
@@ -295,25 +184,25 @@ class _MasjidSelectionScreenState extends State<MasjidSelectionScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: brushGold.withOpacity(0.1),
+        color: const Color(0xFFD4A574).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: brushGold, width: 1),
+        border: Border.all(color: const Color(0xFFD4A574), width: 1),
       ),
       child: Row(
         children: [
-          SizedBox(
+          const SizedBox(
             width: 24,
             height: 24,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              valueColor: const AlwaysStoppedAnimation<Color>(brushGold),
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFD4A574)),
             ),
           ),
           const SizedBox(width: 12),
           Text(
             appLocalization.t(AppStrings.gettingYourLocation),
             style: GoogleFonts.poppins(
-              color: deepEmerald,
+              color: ColorPalette.primary,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -327,7 +216,7 @@ class _MasjidSelectionScreenState extends State<MasjidSelectionScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.1),
+        color: Colors.red.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.red, width: 1),
       ),
@@ -340,7 +229,7 @@ class _MasjidSelectionScreenState extends State<MasjidSelectionScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  _errorMessage ??
+                  context.watch<MasjidProvider>().error ??
                       appLocalization.t(AppStrings.errorOccurredMsg),
                   style: GoogleFonts.poppins(
                     color: Colors.red,
@@ -355,10 +244,12 @@ class _MasjidSelectionScreenState extends State<MasjidSelectionScreen> {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: _initializeLocationAndMasjids,
-              style: ElevatedButton.styleFrom(backgroundColor: deepEmerald),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ColorPalette.primary,
+              ),
               child: Text(
                 appLocalization.t(AppStrings.retryButton),
-                style: GoogleFonts.poppins(color: Colors.white),
+                style: GoogleFonts.poppins(color: Theme.of(context).colorScheme.onPrimary),
               ),
             ),
           ),
@@ -373,23 +264,25 @@ class _MasjidSelectionScreenState extends State<MasjidSelectionScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.location_off_rounded, size: 60, color: brushGold),
+          Icon(
+            Icons.location_off_rounded,
+            size: 60,
+            color: const Color(0xFFD4A574),
+          ),
           const SizedBox(height: 16),
           Text(
             appLocalization.t(AppStrings.noMasjidsFound),
             style: GoogleFonts.poppins(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: deepEmerald,
+              color: ColorPalette.primary,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             appLocalization.t(AppStrings.tryAdjustingYourSearch),
             style: GoogleFonts.poppins(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? Colors.grey.shade400
-                  : Colors.grey.shade600,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           ),
         ],
@@ -398,12 +291,12 @@ class _MasjidSelectionScreenState extends State<MasjidSelectionScreen> {
   }
 
   /// Build masjids list
-  Widget _buildMasjidsList() {
+  Widget _buildMasjidsList(MasjidProvider provider) {
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: _filteredMasjids.length,
+      itemCount: provider.filteredMasjids.length,
       itemBuilder: (context, index) {
-        final masjid = _filteredMasjids[index];
+        final masjid = provider.filteredMasjids[index];
         return _buildMasjidCard(masjid);
       },
     );
@@ -418,7 +311,7 @@ class _MasjidSelectionScreenState extends State<MasjidSelectionScreen> {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: deepEmerald.withOpacity(0.1),
+              color: ColorPalette.primary.withValues(alpha: 0.1),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -426,7 +319,7 @@ class _MasjidSelectionScreenState extends State<MasjidSelectionScreen> {
         ),
         child: Material(
           borderRadius: BorderRadius.circular(20),
-          color: Colors.white.withOpacity(0.9),
+          color: Theme.of(context).colorScheme.surface,
           child: InkWell(
             onTap: () => _selectMasjid(masjid),
             borderRadius: BorderRadius.circular(20),
@@ -448,25 +341,23 @@ class _MasjidSelectionScreenState extends State<MasjidSelectionScreen> {
                               style: GoogleFonts.poppins(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w700,
-                                color: deepEmerald,
+                                color: ColorPalette.primary,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Row(
                               children: [
-                                Icon(
+                                const Icon(
                                   Icons.location_on_rounded,
                                   size: 14,
-                                  color: brushGold,
+                                  color: Color(0xFFD4A574),
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
                                   masjid.location,
                                   style: GoogleFonts.poppins(
                                     fontSize: 13,
-                                    color: Theme.of(context).brightness == Brightness.dark
-                                        ? Colors.grey.shade400
-                                        : Colors.grey.shade600,
+                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                   ),
                                 ),
                               ],
@@ -481,19 +372,23 @@ class _MasjidSelectionScreenState extends State<MasjidSelectionScreen> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: brushGold.withOpacity(0.2),
+                          color: const Color(0xFFD4A574).withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.near_me, size: 14, color: brushGold),
+                            const Icon(
+                              Icons.near_me,
+                              size: 14,
+                              color: Color(0xFFD4A574),
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               _formatDistance(masjid.distanceFromUser),
                               style: GoogleFonts.poppins(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: brushGold,
+                                color: const Color(0xFFD4A574),
                               ),
                             ),
                           ],
@@ -508,7 +403,7 @@ class _MasjidSelectionScreenState extends State<MasjidSelectionScreen> {
                       Icon(
                         Icons.schedule_rounded,
                         size: 16,
-                        color: deepEmerald.withOpacity(0.7),
+                        color: ColorPalette.primary.withValues(alpha: 0.7),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -516,7 +411,7 @@ class _MasjidSelectionScreenState extends State<MasjidSelectionScreen> {
                           '${appLocalization.t(AppStrings.nextPrayerPreview)} ${masjid.prayerTimes.isNotEmpty ? masjid.prayerTimes[0].name : appLocalization.t(AppStrings.unknown)} at ${masjid.prayerTimes.isNotEmpty ? masjid.prayerTimes[0].time : appLocalization.t(AppStrings.unknown)}',
                           style: GoogleFonts.poppins(
                             fontSize: 12,
-                            color: deepEmerald.withOpacity(0.7),
+                            color: ColorPalette.primary.withValues(alpha: 0.7),
                           ),
                         ),
                       ),
@@ -538,7 +433,7 @@ class _MasjidSelectionScreenState extends State<MasjidSelectionScreen> {
                       child: Text(
                         appLocalization.t(AppStrings.selectThisMasjid),
                         style: GoogleFonts.poppins(
-                          color: softCream,
+                          color: const Color(0xFFFAF7F2),
                           fontWeight: FontWeight.w600,
                         ),
                       ),

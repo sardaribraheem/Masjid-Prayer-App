@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/app_data.dart';
+import '../providers/question_provider.dart';
+import '../widgets/shared/empty_state.dart';
 import '../l10n/app_localization.dart';
 import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
@@ -13,7 +16,6 @@ class AdminQAScreen extends StatefulWidget {
 }
 
 class _AdminQAScreenState extends State<AdminQAScreen> {
-  late List<Question> _questions;
   String _filterType = 'all'; // 'all', 'unanswered', 'answered'
 
   @override
@@ -22,31 +24,34 @@ class _AdminQAScreenState extends State<AdminQAScreen> {
     _loadQuestions();
   }
 
-  void _loadQuestions() {
-    setState(() {
-      if (_filterType == 'unanswered') {
-        _questions = AppData.getUnansweredQuestions(
-          AppData.selectedMasjid?.id ?? '',
-        );
-      } else if (_filterType == 'answered') {
-        _questions = AppData.getQuestionsByMasjid(
-          AppData.selectedMasjid?.id ?? '',
-        ).where((q) => q.isAnswered).toList();
-      } else {
-        _questions = AppData.getQuestionsByMasjid(
-          AppData.selectedMasjid?.id ?? '',
-        );
-      }
-    });
+  Future<void> _loadQuestions() async {
+    final masjidId = AppData.selectedMasjid?.id ?? '';
+    if (masjidId.isNotEmpty) {
+      await context.read<QuestionProvider>().loadQuestions(masjidId);
+    }
   }
 
   void _changeFilter(String type) {
     setState(() => _filterType = type);
-    _loadQuestions();
+  }
+
+  List<Question> _getFilteredQuestions() {
+    final masjidId = AppData.selectedMasjid?.id ?? '';
+    final provider = context.watch<QuestionProvider>();
+    final questions = provider.getQuestionsByMasjid(masjidId);
+
+    if (_filterType == 'unanswered') {
+      return questions.where((q) => !q.isAnswered).toList();
+    } else if (_filterType == 'answered') {
+      return questions.where((q) => q.isAnswered).toList();
+    }
+    return questions;
   }
 
   @override
   Widget build(BuildContext context) {
+    final questions = _getFilteredQuestions();
+
     return Scaffold(
       appBar: AppBar(
         title: Text(appLocalization.t(AppStrings.qnaManagementTitle)),
@@ -89,40 +94,31 @@ class _AdminQAScreenState extends State<AdminQAScreen> {
 
           // Questions List
           Expanded(
-            child: _questions.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.inbox_outlined,
-                          size: 80,
-                          color: Colors.grey[300],
+            child: context.watch<QuestionProvider>().isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : questions.isEmpty
+                    ? EmptyState(
+                        icon: Icons.inbox_outlined,
+                        title: appLocalization.t(AppStrings.noQuestionsYet),
+                        subtitle: appLocalization.t(AppStrings.questionsWillAppearHereAdmin),
+                        actionLabel: appLocalization.t(AppStrings.refresh),
+                        onAction: _loadQuestions,
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _loadQuestions,
+                        child: ListView.builder(
+                          itemCount: questions.length,
+                          padding: const EdgeInsets.all(12),
+                          itemBuilder: (context, index) {
+                            return _QuestionCard(
+                              question: questions[index],
+                              onAnswerTap: () {
+                                _showAnswerDialog(context, questions[index]);
+                              },
+                            );
+                          },
                         ),
-                        const SizedBox(height: 16),
-                        Text(
-                          appLocalization.t(AppStrings.noQuestionsYet),
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Theme.of(context).brightness == Brightness.dark
-                                ? ColorPalette.darkTextSecondary
-                                : Colors.grey[500],
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: _questions.length,
-                    padding: const EdgeInsets.all(12),
-                    itemBuilder: (context, index) {
-                      return _QuestionCard(
-                        question: _questions[index],
-                        onAnswerTap: () {
-                          _showAnswerDialog(context, _questions[index]);
-                        },
-                      );
-                    },
-                  ),
+                      ),
           ),
         ],
       ),
@@ -131,7 +127,8 @@ class _AdminQAScreenState extends State<AdminQAScreen> {
 
   /// Show dialog to answer a question
   void _showAnswerDialog(BuildContext context, Question question) {
-    final answerController = TextEditingController(text: question.answer ?? '');
+    final answerController =
+        TextEditingController(text: question.answer ?? '');
 
     showDialog(
       context: context,
@@ -156,9 +153,7 @@ class _AdminQAScreenState extends State<AdminQAScreen> {
                       '${appLocalization.t(AppStrings.questionFrom)} ${question.userName}',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? ColorPalette.darkTextSecondary
-                            : Colors.grey,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -196,7 +191,7 @@ class _AdminQAScreenState extends State<AdminQAScreen> {
             child: Text(appLocalization.t(AppStrings.cancel)),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (answerController.text.trim().isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -208,8 +203,12 @@ class _AdminQAScreenState extends State<AdminQAScreen> {
                 return;
               }
 
-              // Save the answer
-              AppData.answerQuestion(question.id, answerController.text.trim());
+              // Save the answer via provider
+              await context.read<QuestionProvider>().answerQuestion(
+                    AppData.selectedMasjid?.id ?? '',
+                    question.id,
+                    answerController.text.trim(),
+                  );
 
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -219,7 +218,6 @@ class _AdminQAScreenState extends State<AdminQAScreen> {
               );
 
               Navigator.pop(context);
-              _loadQuestions(); // Refresh the list
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: ColorPalette.primary,
@@ -253,16 +251,14 @@ class _FilterChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? ColorPalette.primary : 
-            (Theme.of(context).brightness == Brightness.dark
-              ? ColorPalette.darkCardBg
-              : Colors.grey[200]),
+          color: isSelected
+              ? ColorPalette.primary
+              : Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? ColorPalette.primary : 
-              (Theme.of(context).brightness == Brightness.dark
-                ? ColorPalette.darkBorder
-                : Colors.grey[300]!),
+            color: isSelected
+                ? ColorPalette.primary
+                : Theme.of(context).colorScheme.outline,
           ),
         ),
         child: Row(
@@ -271,17 +267,19 @@ class _FilterChip extends StatelessWidget {
             Icon(
               icon,
               size: 18,
-              color: isSelected ? Colors.white : Colors.grey[600],
+              color: isSelected
+                  ? Theme.of(context).colorScheme.onPrimary
+                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
             ),
             const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
-                color: isSelected ? Colors.white : 
-                  (Theme.of(context).brightness == Brightness.dark
-                    ? ColorPalette.darkText
-                    : Colors.grey[600]),
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected
+                    ? Theme.of(context).colorScheme.onPrimary
+                    : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                fontWeight:
+                    isSelected ? FontWeight.bold : FontWeight.normal,
               ),
             ),
           ],
@@ -327,7 +325,10 @@ class _QuestionCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         _formatTime(question.timestamp),
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
                       ),
                     ],
                   ),
@@ -339,8 +340,8 @@ class _QuestionCard extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: question.isAnswered
-                        ? Colors.green[100]
-                        : Colors.red[100],
+                        ? ColorPalette.success.withValues(alpha: 0.15)
+                        : ColorPalette.error.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -351,7 +352,9 @@ class _QuestionCard extends StatelessWidget {
                             ? Icons.check_circle
                             : Icons.pending_actions,
                         size: 16,
-                        color: question.isAnswered ? Colors.green : Colors.red,
+                        color: question.isAnswered
+                            ? ColorPalette.success
+                            : ColorPalette.error,
                       ),
                       const SizedBox(width: 4),
                       Text(
@@ -362,8 +365,8 @@ class _QuestionCard extends StatelessWidget {
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                           color: question.isAnswered
-                              ? Colors.green
-                              : Colors.red,
+                              ? ColorPalette.success
+                              : ColorPalette.error,
                         ),
                       ),
                     ],
@@ -388,7 +391,7 @@ class _QuestionCard extends StatelessWidget {
                     appLocalization.t(AppStrings.question),
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey[600],
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -418,7 +421,7 @@ class _QuestionCard extends StatelessWidget {
                       appLocalization.t(AppStrings.answerText),
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey[600],
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                         fontWeight: FontWeight.bold,
                       ),
                     ),

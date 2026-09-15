@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 /// Category Slider Widget for Community Page
 /// Horizontally scrollable category selection with icons
@@ -21,9 +22,10 @@ class CategorySlider extends StatefulWidget {
 class _CategorySliderState extends State<CategorySlider> {
   @override
   Widget build(BuildContext context) {
-    const Color deepEmerald = Color(0xFF1B5E47);
-    const Color brushGold = Color(0xFFD4A574);
-    const Color softCream = Color(0xFFFAF7F2);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = Theme.of(context).colorScheme.surface;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final borderColor = Theme.of(context).colorScheme.outline;
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -45,16 +47,16 @@ class _CategorySliderState extends State<CategorySlider> {
                     height: 70,
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? deepEmerald.withOpacity(0.15)
-                          : softCream,
+                          ? ColorPalette.primary.withValues(alpha: isDark ? 0.25 : 0.15)
+                          : cardColor,
                       border: isSelected
-                          ? Border.all(color: brushGold, width: 2.5)
-                          : Border.all(color: Colors.grey[200]!, width: 1.5),
+                          ? Border.all(color: ColorPalette.secondary, width: 2.5)
+                          : Border.all(color: borderColor, width: 1.5),
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: isSelected
                           ? [
                               BoxShadow(
-                                color: brushGold.withOpacity(0.2),
+                                color: ColorPalette.secondary.withValues(alpha: 0.2),
                                 blurRadius: 8,
                                 offset: const Offset(0, 2),
                               ),
@@ -64,7 +66,7 @@ class _CategorySliderState extends State<CategorySlider> {
                     child: Icon(
                       category.icon,
                       size: 32,
-                      color: isSelected ? brushGold : deepEmerald,
+                      color: isSelected ? ColorPalette.secondary : ColorPalette.primary,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -78,7 +80,7 @@ class _CategorySliderState extends State<CategorySlider> {
                         fontSize: 11,
                         fontWeight:
                             isSelected ? FontWeight.bold : FontWeight.w500,
-                        color: isSelected ? deepEmerald : Colors.grey[600],
+                        color: isSelected ? ColorPalette.primary : onSurface.withValues(alpha: 0.6),
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,

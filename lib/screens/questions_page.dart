@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/app_data.dart';
+import '../providers/question_provider.dart';
+import '../widgets/shared/empty_state.dart';
 import '../l10n/app_localization.dart';
 import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
@@ -18,13 +21,26 @@ class _QuestionsPageState extends State<QuestionsPage> {
   String _filterType = 'all'; // 'all', 'answered', 'unanswered'
 
   @override
+  void initState() {
+    super.initState();
+    _loadQuestions();
+  }
+
+  Future<void> _loadQuestions() async {
+    final masjidId = AppData.selectedMasjid?.id ?? '';
+    if (masjidId.isNotEmpty) {
+      await context.read<QuestionProvider>().loadQuestions(masjidId);
+    }
+  }
+
+  @override
   void dispose() {
     _nameController.dispose();
     _questionController.dispose();
     super.dispose();
   }
 
-  void _submitQuestion() {
+  Future<void> _submitQuestion() async {
     if (_nameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -43,27 +59,29 @@ class _QuestionsPageState extends State<QuestionsPage> {
       return;
     }
 
-    AppData.addQuestion(
-      _nameController.text.trim(),
-      _questionController.text.trim(),
-      AppData.selectedMasjid?.id ?? 'unknown',
-    );
+    final success = await context.read<QuestionProvider>().addQuestion(
+          userName: _nameController.text.trim(),
+          questionText: _questionController.text.trim(),
+          masjidId: AppData.selectedMasjid?.id ?? 'unknown',
+        );
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(appLocalization.t(AppStrings.questionSubmitted)),
-        backgroundColor: ColorPalette.success,
-      ),
-    );
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(appLocalization.t(AppStrings.questionSubmitted)),
+          backgroundColor: ColorPalette.success,
+        ),
+      );
+    }
 
     _nameController.clear();
     _questionController.clear();
-    setState(() {});
   }
 
   List<Question> _getFilteredQuestions() {
     final masjidId = AppData.selectedMasjid?.id ?? '';
-    final questions = AppData.getQuestionsByMasjid(masjidId);
+    final provider = context.watch<QuestionProvider>();
+    final questions = provider.getQuestionsByMasjid(masjidId);
 
     if (_filterType == 'answered') {
       return questions.where((q) => q.isAnswered).toList();
@@ -75,6 +93,12 @@ class _QuestionsPageState extends State<QuestionsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final masjidId = AppData.selectedMasjid?.id ?? '';
+    if (masjidId.isNotEmpty) {
+      // Ensure we're subscribed to real-time updates
+      context.read<QuestionProvider>().subscribeToQuestions(masjidId);
+    }
+
     final filteredQuestions = _getFilteredQuestions();
 
     return Scaffold(
@@ -180,38 +204,30 @@ class _QuestionsPageState extends State<QuestionsPage> {
 
           // Questions List
           Expanded(
-            child: filteredQuestions.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.inbox_outlined,
-                          size: 64,
-                          color: ColorPalette.lightTextSecondary,
+            child: context.watch<QuestionProvider>().isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : filteredQuestions.isEmpty
+                    ? EmptyState(
+                        icon: Icons.inbox_outlined,
+                        title: appLocalization.t(AppStrings.noQuestions),
+                        subtitle: appLocalization.t(AppStrings.questionsWillAppearHere),
+                        actionLabel: appLocalization.t(AppStrings.refresh),
+                        onAction: _loadQuestions,
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _loadQuestions,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          itemCount: filteredQuestions.length,
+                          itemBuilder: (context, index) {
+                            final question = filteredQuestions[index];
+                            return _QuestionCard(question: question);
+                          },
                         ),
-                        const SizedBox(height: 12),
-                        Text(
-                          appLocalization.t(AppStrings.noQuestions),
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(
-                                color: ColorPalette.lightTextSecondary,
-                              ),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    itemCount: filteredQuestions.length,
-                    itemBuilder: (context, index) {
-                      final question = filteredQuestions[index];
-                      return _QuestionCard(question: question);
-                    },
-                  ),
+                      ),
           ),
         ],
       ),
@@ -244,7 +260,9 @@ class _FilterButton extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : ColorPalette.lightTextSecondary,
+            color: isSelected
+                ? Theme.of(context).colorScheme.onPrimary
+                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             fontSize: 12,
           ),
@@ -265,13 +283,13 @@ class _QuestionCard extends StatelessWidget {
     final difference = now.difference(dateTime);
 
     if (difference.inSeconds < 60) {
-      return 'Just now';
+      return appLocalization.t(AppStrings.justNow);
     } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}m ago';
+      return '${difference.inMinutes}${appLocalization.t(AppStrings.minutesAgo)}';
     } else if (difference.inHours < 24) {
-      return '${difference.inHours}h ago';
+      return '${difference.inHours}${appLocalization.t(AppStrings.hoursAgo)}';
     } else if (difference.inDays < 7) {
-      return '${difference.inDays}d ago';
+      return '${difference.inDays}${appLocalization.t(AppStrings.daysAgo)}';
     } else {
       return '${dateTime.month}/${dateTime.day}';
     }
@@ -305,7 +323,10 @@ class _QuestionCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         _formatTime(question.timestamp),
-                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
                       ),
                     ],
                   ),
@@ -317,16 +338,20 @@ class _QuestionCard extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: question.isAnswered
-                        ? Colors.green[100]
-                        : Colors.orange[100],
+                        ? ColorPalette.success.withValues(alpha: 0.15)
+                        : ColorPalette.warning.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    question.isAnswered ? '✓ Answered' : 'Pending',
+                    question.isAnswered
+                        ? appLocalization.t(AppStrings.answered)
+                        : appLocalization.t(AppStrings.pending),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: question.isAnswered ? Colors.green : Colors.orange,
+                      color: question.isAnswered
+                          ? ColorPalette.success
+                          : ColorPalette.warning,
                     ),
                   ),
                 ),
@@ -337,14 +362,14 @@ class _QuestionCard extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.blue[50],
+                color: ColorPalette.info.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Q: ' + question.questionText,
+                    '${appLocalization.t(AppStrings.question)} ${question.questionText}',
                     style: const TextStyle(fontSize: 13),
                   ),
                 ],
@@ -356,14 +381,14 @@ class _QuestionCard extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.green[50],
+                  color: ColorPalette.success.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'A: ' + question.answer!,
+                      '${appLocalization.t(AppStrings.answerText)} ${question.answer!}',
                       style: const TextStyle(fontSize: 13),
                     ),
                   ],

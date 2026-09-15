@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/app_data.dart';
-import '../l10n/app_localization.dart';
+import '../theme/app_theme.dart';
 
 /// Enhanced Event Card Widget for Community Page
 /// Shows comprehensive event information with better design
@@ -55,17 +55,15 @@ class EnhancedEventCard extends StatelessWidget {
       case 'gasht':
         return const Color(0xFFFF9800); // Orange
       default:
-        return const Color(0xFF1B5E47); // Deep Emerald
+        return ColorPalette.primary;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    const Color deepEmerald = Color(0xFF1B5E47);
-    const Color brushGold = Color(0xFFD4A574);
-
     final categoryColor = _getCategoryColor();
-    final translations = appLocalization.translations;
+    final cardColor = Theme.of(context).colorScheme.surface;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14, left: 12, right: 12),
@@ -73,7 +71,7 @@ class EnhancedEventCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: deepEmerald.withOpacity(0.08),
+            color: ColorPalette.primary.withValues(alpha: 0.08),
             blurRadius: 12,
             offset: const Offset(0, 3),
           ),
@@ -81,7 +79,7 @@ class EnhancedEventCard extends StatelessWidget {
       ),
       child: Material(
         borderRadius: BorderRadius.circular(16),
-        color: Colors.white,
+        color: cardColor,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -97,20 +95,20 @@ class EnhancedEventCard extends StatelessWidget {
                       children: [
                         Text(
                           event.masjidName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
-                            color: Color(0xFF999999),
+                            color: onSurface.withValues(alpha: 0.5),
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 2),
                         Text(
                           event.title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: deepEmerald,
+                            color: ColorPalette.primary,
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -127,10 +125,10 @@ class EnhancedEventCard extends StatelessWidget {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: categoryColor.withOpacity(0.15),
+                        color: categoryColor.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: categoryColor.withOpacity(0.4),
+                          color: categoryColor.withValues(alpha: 0.4),
                           width: 1,
                         ),
                       ),
@@ -163,7 +161,7 @@ class EnhancedEventCard extends StatelessWidget {
                 event.description,
                 style: TextStyle(
                   fontSize: 13,
-                  color: Colors.grey[700],
+                  color: onSurface.withValues(alpha: 0.65),
                   height: 1.4,
                 ),
                 maxLines: 2,
@@ -178,10 +176,10 @@ class EnhancedEventCard extends StatelessWidget {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFAF7F2).withOpacity(0.6),
+                  color: Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: Colors.grey[200]!,
+                    color: Theme.of(context).colorScheme.outline,
                     width: 1,
                   ),
                 ),
@@ -190,31 +188,31 @@ class EnhancedEventCard extends StatelessWidget {
                     Icon(
                       Icons.calendar_month,
                       size: 16,
-                      color: brushGold,
+                      color: ColorPalette.secondary,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         _formatDate(event.eventDate),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
-                          color: deepEmerald,
+                          color: ColorPalette.primary,
                         ),
                       ),
                     ),
                     Icon(
                       Icons.access_time,
                       size: 16,
-                      color: brushGold,
+                      color: ColorPalette.secondary,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       '${event.startTime} - ${event.endTime}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
-                        color: deepEmerald,
+                        color: ColorPalette.primary,
                       ),
                     ),
                   ],
@@ -229,7 +227,7 @@ class EnhancedEventCard extends StatelessWidget {
                     Icon(
                       Icons.location_on_outlined,
                       size: 14,
-                      color: Colors.grey[600],
+                      color: onSurface.withValues(alpha: 0.5),
                     ),
                     const SizedBox(width: 6),
                     Expanded(
@@ -237,7 +235,7 @@ class EnhancedEventCard extends StatelessWidget {
                         event.location!,
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[600],
+                          color: onSurface.withValues(alpha: 0.5),
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
