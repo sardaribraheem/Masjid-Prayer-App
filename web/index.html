@@ -32,27 +32,11 @@
   <title>Masjid Prayer App</title>
   <link rel="manifest" href="manifest.json">
 
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"></script>
-  
-  <script>
-    // Your web app's Firebase configuration
-    const firebaseConfig = {
-      apiKey: "AIzaSyDf62La3ntI8rvL8SQqv7GH69pRqfFU4h8",
-      authDomain: "masjid-prayer-app-49f50.firebaseapp.com",
-      projectId: "masjid-prayer-app-49f50",
-      storageBucket: "masjid-prayer-app-49f50.firebasestorage.app",
-      messagingSenderId: "493201204446",
-      appId: "1:493201204446:web:811c50faa61c1b51b30e4f"
-    };
-
-    // Initialize Firebase (will be used by Flutter app)
-    if (!window.firebase) {
-      firebase.initializeApp(firebaseConfig);
-    }
-  </script>
+  <!--
+    Firebase is initialized by the Flutter app via lib/firebase_options.dart
+    (flutterfire). Do NOT add manual Firebase SDK script tags here — they are
+    redundant and cause "firebase is not defined" errors.
+  -->
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>

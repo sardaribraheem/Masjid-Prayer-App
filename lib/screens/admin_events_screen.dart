@@ -19,7 +19,11 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadEvents();
+    // Defer past the first frame: loadEvents() notifies synchronously, which
+    // would otherwise trigger "setState() called during build".
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadEvents();
+    });
   }
 
   Future<void> _loadEvents() async {

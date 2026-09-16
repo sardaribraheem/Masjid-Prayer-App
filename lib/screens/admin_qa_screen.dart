@@ -21,7 +21,11 @@ class _AdminQAScreenState extends State<AdminQAScreen> {
   @override
   void initState() {
     super.initState();
-    _loadQuestions();
+    // Defer past the first frame: loadQuestions() notifies synchronously, which
+    // would otherwise trigger "setState() called during build".
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadQuestions();
+    });
   }
 
   Future<void> _loadQuestions() async {

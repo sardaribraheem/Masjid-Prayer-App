@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/app_data.dart';
 import '../repositories/question_repository.dart';
@@ -6,6 +7,8 @@ import '../repositories/question_repository.dart';
 /// Wraps QuestionRepository and provides reactive state for the UI.
 class QuestionProvider extends ChangeNotifier {
   final QuestionRepository _repository = QuestionRepository();
+
+  StreamSubscription<List<Question>>? _streamSub;
 
   List<Question> _questions = [];
   bool _isLoading = false;
@@ -43,12 +46,24 @@ class QuestionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Listen to real-time updates for questions
-  void subscribeToQuestions(String masjidId) {
-    _repository.getQuestionsStream(masjidId).listen((questions) {
+  /// Listen to real-time updates for questions. Cancels any prior subscription
+  /// (tab switching recreates pages) and returns the new subscription so the
+  /// caller can cancel it in dispose().
+  StreamSubscription<List<Question>> subscribeToQuestions(String masjidId) {
+    _streamSub?.cancel();
+    final sub = _repository.getQuestionsStream(masjidId).listen((questions) {
       _questions = questions;
+      _error = null;
       notifyListeners();
     });
+    _streamSub = sub;
+    return sub;
+  }
+
+  @override
+  void dispose() {
+    _streamSub?.cancel();
+    super.dispose();
   }
 
   /// Add a new question

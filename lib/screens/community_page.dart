@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/app_data.dart';
@@ -23,10 +24,29 @@ class _CommunityPageState extends State<CommunityPage> {
   String _selectedCategory = 'all'; // Category filter
   String _searchQuery = ''; // Search query
 
+  StreamSubscription<List<Event>>? _eventSub;
+
   @override
   void initState() {
     super.initState();
-    _loadEvents();
+    // Defer past the first frame: loadEvents()/subscribeToEvents() notify
+    // synchronously, which would otherwise trigger "setState() called during
+    // build". Subscribing here (not in build) also avoids creating a new
+    // Firestore listener on every rebuild.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _loadEvents();
+      final masjidId = AppData.selectedMasjid?.id ?? '';
+      if (masjidId.isNotEmpty) {
+        _eventSub = context.read<EventProvider>().subscribeToEvents(masjidId);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _eventSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadEvents() async {
@@ -56,17 +76,6 @@ class _CommunityPageState extends State<CommunityPage> {
     final provider = context.watch<EventProvider>();
     List<Event> events = provider.getEventsByMasjid(masjidId);
 
-    // Fall back to AppData if provider has no events
-    if (events.isEmpty && AppData.allEvents.isNotEmpty) {
-      if (_filterType == 'upcoming') {
-        events = AppData.getUpcomingEvents();
-      } else if (_filterType == 'nearby') {
-        events = AppData.getEventsSortedByDistance();
-      } else {
-        events = AppData.allEvents.toList().reversed.toList();
-      }
-    }
-
     // Apply category filter
     if (_selectedCategory != 'all') {
       events = events
@@ -93,11 +102,6 @@ class _CommunityPageState extends State<CommunityPage> {
 
   @override
   Widget build(BuildContext context) {
-    final masjidId = AppData.selectedMasjid?.id ?? '';
-    if (masjidId.isNotEmpty) {
-      context.read<EventProvider>().subscribeToEvents(masjidId);
-    }
-
     final filteredEvents = _getFilteredEvents();
 
     return Scaffold(

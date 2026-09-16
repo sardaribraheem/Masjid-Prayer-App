@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:provider/provider.dart';
 import 'models/app_data.dart';
 import 'screens/masjid_selection_screen.dart';
@@ -30,18 +30,17 @@ void main() async {
   final firebaseService = FirebaseService();
   await firebaseService.initialize();
 
-  // Initialize app data with fallback data (debug only — production reads from Firestore)
-  if (kDebugMode) {
-    AppData.initialize();
-    // Initialize users
-    AppData.initializeUsers();
-
-    // Try to initialize Firebase sample data
-    try {
-      await firebaseService.initializeSampleData();
-    } catch (e) {
-      // Handle initialization error silently
+  // Ensure there is always a Firebase Auth user (anonymous if needed).
+  // This is required so Firestore rules that check isSignedIn() pass for
+  // normal users reading/writing questions and events.
+  try {
+    final currentUser = auth.FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      await auth.FirebaseAuth.instance.signInAnonymously();
     }
+  } catch (e) {
+    // If anonymous sign-in fails, the app can still function in read-only
+    // mode for publicly readable data, but writes will fail.
   }
 
   // Check if a masjid was previously selected

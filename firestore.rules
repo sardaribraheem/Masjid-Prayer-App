@@ -1,52 +1,56 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper functions
+    // ============ HELPER FUNCTIONS ============
+
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isOwner(masjidId) {
-      return isSignedIn() &&
-        (request.auth.token.email == getMasjidUsername(masjidId) ||
-         request.auth.token.email == 'superadmin@masjid-app.com');
-    }
-
-    function getMasjidUsername(masjidId) {
+    /// Read the masjid document to get its stored admin email.
+    function getMasjidAdminEmail(masjidId) {
       return get(/databases/$(database)/documents/masjids/$(masjidId)).data.username;
     }
 
+    /// A user is admin of a masjid if their Firebase Auth email matches the
+    /// masjid document's `username` field (which stores the admin email).
+    /// Also accepts the super-admin hardcoded email.
     function isAdmin(masjidId) {
       return isSignedIn() && (
-        // Check if user is the masjid's admin/imam via custom claims or direct match
-        request.auth.token.adminFor == masjidId ||
-        request.auth.token.imamFor == masjidId ||
-        request.auth.token.email == getMasjidUsername(masjidId)
+        request.auth.token.email == getMasjidAdminEmail(masjidId) ||
+        request.auth.token.email == 'superadmin@masjid-app.com'
       );
     }
 
-    // ============ PUBLIC READS ============
-    // Anyone (signed in or not) can read masjid listings
+    // ============ MASJID DOCUMENTS ============
     match /masjids/{masjidId} {
+      // Anyone (signed in or not) can read masjid listings
       allow read: if true;
 
-      // Only the admin/imam (or super admin) can update this masjid's document
-      allow update: if isAdmin(masjidId) || isOwner(masjidId);
+      // Only the admin (email match) or super admin can update a masjid
+      allow update: if isAdmin(masjidId);
 
-      // Only super admin can create/delete masjid documents
-      allow create, delete: if request.auth.token.email == 'superadmin@masjid-app.com';
+      // Any signed-in user can create a masjid, but the `username` field
+      // (admin email) must match the creator's Firebase Auth email. This
+      // prevents impersonation while allowing self-registration.
+      allow create: if isSignedIn() &&
+        request.resource.data.username == request.auth.token.email;
+
+      // Only super admin can delete masjid documents
+      allow delete: if isSignedIn() &&
+        request.auth.token.email == 'superadmin@masjid-app.com';
 
       // ============ SUB-COLLECTION: questions ============
       match /questions/{questionId} {
-        // Anyone signed in can read questions
+        // Any signed-in user can read questions for their masjid
         allow read: if isSignedIn();
 
-        // Only signed-in users can post questions
-        allow create: if isSignedIn() && request.resource.data.masjidId == masjidId;
+        // Any signed-in user can create a question (must set correct masjidId)
+        allow create: if isSignedIn() &&
+          request.resource.data.masjidId == masjidId;
 
         // Only admin/imam can answer (update answer/isAnswered fields)
         allow update: if isAdmin(masjidId) &&
-          // Only allow updating answer and isAnswered fields
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['answer', 'isAnswered']);
 
@@ -56,30 +60,30 @@ service cloud.firestore {
 
       // ============ SUB-COLLECTION: events ============
       match /events/{eventId} {
-        // Anyone signed in can read events
+        // Any signed-in user can read events
         allow read: if isSignedIn();
 
-        // Only admin/imam can create events
-        allow create: if isAdmin(masjidId) && request.resource.data.masjidId == masjidId;
+        // Only admin can create events
+        allow create: if isAdmin(masjidId) &&
+          request.resource.data.masjidId == masjidId;
 
-        // Only admin/imam can update events
+        // Only admin can update events
         allow update: if isAdmin(masjidId);
 
-        // Only admin/imam can delete events
+        // Only admin can delete events
         allow delete: if isAdmin(masjidId);
       }
     }
 
     // ============ CLAIM REQUESTS (Super Admin Only) ============
     match /claimRequests/{claimId} {
-      // Only super admin can read claim requests
-      allow read: if request.auth.token.email == 'superadmin@masjid-app.com';
+      allow read: if isSignedIn() &&
+        request.auth.token.email == 'superadmin@masjid-app.com';
 
-      // Any signed-in user can submit a claim request
       allow create: if isSignedIn();
 
-      // Only super admin can update/delete claims
-      allow update, delete: if request.auth.token.email == 'superadmin@masjid-app.com';
+      allow update, delete: if isSignedIn() &&
+        request.auth.token.email == 'superadmin@masjid-app.com';
     }
 
     // Deny all other collections by default

@@ -20,9 +20,19 @@ class FirebaseService {
   /// `lib/firebase_options.dart`. Run `flutterfire configure` to regenerate
   /// the file with project-specific credentials for android, ios, macos, etc.
   Future<void> initialize() async {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    // On Android, google-services.json auto-initializes Firebase via the
+    // native GoogleServices plugin before Dart runs, so Firebase.apps
+    // may appear empty while the native default app already exists.
+    // A second call to initializeApp then throws [core/duplicate-app].
+    // We guard with a try-catch so the app works regardless.
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    } catch (e) {
+      if (!e.toString().contains('duplicate-app')) rethrow;
+      // Firebase already initialized — safe to continue.
+    }
     _firestore = FirebaseFirestore.instance;
 
     // Set Firestore settings for better performance

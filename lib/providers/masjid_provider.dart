@@ -51,14 +51,8 @@ class MasjidProvider extends ChangeNotifier {
 
     try {
       _allMasjids = await _firebaseService.getAllMasjids();
-      if (_allMasjids.isEmpty) {
-        // Fallback to AppData cached masjids
-        _allMasjids = List.from(AppData.allMasjids);
-      }
       _sortByDistance();
     } catch (e) {
-      // Fallback to AppData
-      _allMasjids = List.from(AppData.allMasjids);
       _error = e.toString();
     }
 
@@ -80,13 +74,8 @@ class MasjidProvider extends ChangeNotifier {
         latitude,
         longitude,
       );
-      if (_allMasjids.isEmpty) {
-        _allMasjids = List.from(AppData.allMasjids);
-        _sortByDistance();
-      }
-    } catch (e) {
-      _allMasjids = List.from(AppData.allMasjids);
       _sortByDistance();
+    } catch (e) {
       _error = e.toString();
     }
 
@@ -118,16 +107,7 @@ class MasjidProvider extends ChangeNotifier {
         return true;
       }
     } catch (e) {
-      // Try local fallback
-      for (var m in AppData.allMasjids) {
-        if (m.id == selectedId) {
-          _selectedMasjid = m;
-          AppData.selectedMasjid = m;
-          AppData.selectedMasjidId = m.id;
-          notifyListeners();
-          return true;
-        }
-      }
+      // Error fetching masjid
     }
     return false;
   }

@@ -1,91 +1,129 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Project guidance for Claude Code working in this repository.
 
 ## Project Overview
 
-Masjid Prayer App — a Flutter app for mosque communities. Users select a nearby masjid, view prayer times, browse community events, post questions (answered by imams/admins), and manage settings with dark mode and English/Urdu localization (RTL support). Admins/imams can log in to manage prayer times, events, and answer questions.
+**Masjid Prayer App** — a Flutter app for the **Hassan Masjid** community (first real deployment target). Users select the masjid, view prayer times, browse community events, post questions (answered by imams/admins), request verification, and manage settings (dark mode, English/Urdu, RTL). Admins/imams manage prayer times, events, Q&A, and verification requests.
 
-**Dart SDK:** ^3.9.0 | **Backend:** Firebase Firestore | **Local storage:** shared_preferences
+**Dart SDK:** ^3.9.0 | **Framework:** Flutter 3.44.x | **Backend:** Firebase (Auth + Firestore) | **Local state:** shared_preferences + ChangeNotifier/Provider
+
+**Firebase project:** `masjid-prayer-app-49f50` (web config in `lib/firebase_options.dart`; Android via `google-services.json`).
+
+> **Deployment principle (from `latesttodo.md`):** *Real User → Real Firebase → Real Data → Real Imam/Admin → Real Persistence.* Do NOT silently fall back to sample/local data when Firebase fails. Make Firebase errors visible during development. Do not keep adding features — the local MVP for Hassan Masjid must work first.
 
 ## Commands
 
 ```bash
-# Run the app (Chrome for web, or connected device)
-flutter run -d chrome
-flutter run
-
-# Build
-flutter build web
-flutter build apk
-flutter build ios
-
-# Analyze (no test suite present)
-flutter analyze
-
-# Format
-dart format lib/
-
-# Get dependencies
 flutter pub get
+flutter analyze          # no test suite exists
+dart format lib/
+flutter run -d <device>  # or -d chrome for web
+flutter build apk        # Android release
 ```
 
-No test suite exists in the project.
+Firestore rules/indexes are deployed with:
+```bash
+firebase deploy --only firestore:rules
+```
 
 ## Architecture
 
 ```
 lib/
-├── main.dart                    # Entry point, initializes services, routes to first screen
+├── main.dart                  # Entry: init localization/storage/firebase, anonymous-auth fallback, routes to MainNavigation or MasjidSelection
+├── firebase_options.dart      # Generated Firebase config (web is REAL; other platforms have PLACEHOLDER values!)
 ├── models/
-│   └── app_data.dart            # All data models + global AppData singleton (static state)
-├── screens/                     # UI screens
-│   ├── masjid_selection_screen  # First screen: pick a masjid (sorted by distance)
-│   ├── main_navigation_screen   # Bottom nav shell (4 tabs)
-│   ├── prayer_page              # Tab 1: prayer times + countdown
-│   ├── community_page           # Tab 2: community events
-│   ├── questions_page           # Tab 3: Q&A list
-│   ├── settings_page            # Tab 4: language, theme, profile
-│   ├── admin_login_screen       # Imam/admin login
-│   ├── admin_register_screen    # Register new masjid
-│   ├── admin_panel_screen       # Dashboard to manage prayer times & events
-│   ├── admin_qa_screen          # Answer user questions
-│   └── ask_question_screen      # Post a question
+│   └── app_data.dart          # Masjid, PrayerTime, Question, Event, User, UserRole + AppData (static global state)
 ├── services/
-│   ├── firebase_service.dart    # Singleton — all Firestore CRUD operations
-│   ├── storage_service.dart     # Singleton — local persistence via shared_preferences
-│   └── location_service.dart    # GPS location (geolocator + location packages)
+│   ├── firebase_service.dart  # Singleton: Firestore CRUD, streams, sample-data seeding (MUST REMOVE)
+│   ├── storage_service.dart   # Singleton: shared_preferences persistence
+│   └── location_service.dart  # geolocator wrapper
+├── repositories/              # Firestore subcollection CRUD (separate from legacy FirebaseService)
+│   ├── question_repository.dart  # masjids/{id}/questions
+│   ├── event_repository.dart     # masjids/{id}/events
+│   └── masjid_repository.dart    # masjids + claimRequests
+├── providers/                 # ChangeNotifier state wrappers (Provider package)
+│   ├── auth_provider.dart     # FirebaseAuth state → app.User (role mapping)
+│   ├── question_provider.dart # question list + stream subscription
+│   ├── event_provider.dart    # event list + stream subscription
+│   ├── masjid_provider.dart   # masjid list, filtering, selection, distance sort
+│   ├── masjid_claim_provider.dart
+│   ├── location_provider.dart # GPS state
+│   └── settings_provider.dart # dark mode / language / notifications (persisted)
+├── screens/                   # 17 screens (see below)
+├── l10n/                      # Key-based manual localization (NOT Flutter built-in)
+│   ├── app_localization.dart  # appLocalization singleton (ChangeNotifier), t(key), isRTL
+│   ├── app_strings.dart       # AppStrings.* key constants
+│   └── app_translations.dart  # EN/UR maps
 ├── theme/
-│   ├── app_theme.dart           # Light/dark ThemeData + ColorPalette constants
-│   └── app_state.dart           # AppStateProvider (ChangeNotifier) for dark mode toggle
-├── l10n/
-│   ├── app_localization.dart    # Localization singleton (ListenableBuilder-compatible)
-│   ├── app_strings.dart         # String key enum (AppStrings.xxx)
-│   └── app_translations.dart    # EN/UR translation maps
-└── widgets/
-    ├── category_slider.dart     # Horizontal category filter chips
-    ├── enhanced_event_card.dart # Event card with details
-    └── event_search_bar.dart    # Search/filter bar for events
+│   ├── app_theme.dart         # ColorPalette constants + light/dark ThemeData
+│   └── app_state.dart         # appStateProvider (dark mode ChangeNotifier)
+├── utils/                     # distance_utils, time_utils, validators
+└── widgets/                   # category_slider, enhanced_event_card, event_search_bar, shared/*
 ```
 
-**Key architectural decisions:**
+## Screens (17)
 
-- **`AppData` (static singleton):** Global mutable state holder — `selectedMasjid`, `allMasjids`, `allQuestions`, `allEvents`, `currentUser`, `allUsers`. All data access is through static methods on this class. Not reactive — UI must manually rebuild.
-- **`FirebaseService` / `StorageService`:** Singleton pattern (`factory` constructor returning a single `_instance`). Both initialized in `main()` before `runApp()`.
-- **Role-based access:** `UserRole` enum (guest → verifiedUser → imam → admin) with permission getters on the `User` model. Imam and admin have most elevated permissions.
-- **Localization:** Manual key-based system (not Flutter's built-in `l10n`). Use `appLocalization.t(AppStrings.someKey)` to get translated strings. RTL is toggled via `appLocalization.isRTL`.
-- **Theming:** Colors defined as static constants in `ColorPalette`. Light/dark variants accessed as `ColorPalette.lightXxx` / `ColorPalette.darkXxx`. Theme toggle uses `AppStateProvider` (a `ChangeNotifier` exposed via global `appStateProvider` instance).
+| Screen | File | Purpose |
+|---|---|---|
+| MasjidSelectionScreen | `screens/masjid_selection_screen.dart` | First screen — pick nearby masjid (location-sorted) |
+| MainNavigationScreen | `screens/main_navigation_screen.dart` | 4-tab bottom nav shell |
+| PrayerPage | `screens/prayer_page.dart` | Tab 1 — prayer times + countdown (live Firestore stream) |
+| CommunityPage | `screens/community_page.dart` | Tab 2 — events, search, category + filter chips |
+| QuestionsPage | `screens/questions_page.dart` | Tab 3 — ask question + list with answer status |
+| SettingsPage | `screens/settings_page.dart` | Tab 4 — profile, masjid, prefs, admin panel, about |
+| AdminLoginScreen | `screens/admin_login_screen.dart` | Email/password + Google admin login |
+| AdminPanelScreen | `screens/admin_panel_screen.dart` | Edit prayer times + links to Q&A/Events mgmt |
+| AdminQAScreen | `screens/admin_qa_screen.dart` | Answer/delete user questions |
+| AdminEventsScreen | `screens/admin_events_screen.dart` | Event CRUD (dialog form) |
+| AdminRegisterScreen | `screens/admin_register_screen.dart` | Register new masjid (creates Auth + Firestore doc) |
+| AskQuestionScreen | `screens/ask_question_screen.dart` | Dedicated ask-question form |
+| EditProfileScreen | `screens/edit_profile_screen.dart` | Display name + password change (re-auth via EmailAuthProvider) |
+| ClaimMasjidScreen | `screens/claim_masjid_screen.dart` | Request to claim/register a masjid |
+| SuperAdminDashboard | `screens/super_admin_dashboard.dart` | Approve claim requests |
+| HomeScreen | `screens/home_screen.dart` | LEGACY pre-nav-screen prayer view (not routed anymore) |
 
-**Data flow pattern:**
-1. `FirebaseService` fetches from Firestore → maps to `AppData` static fields
-2. UI reads from `AppData` statics directly
-3. Mutations go through `AppData` static methods (local) or `FirebaseService` (Firestore)
-4. Real-time updates use `StreamBuilder` wrapping `FirebaseService.getMasjidStream()`
+## Key Architectural Facts
 
-## Important Files
+- **`AppData`** is a static singleton — NOT reactive. `selectedMasjid`, `allMasjids`, `allQuestions`, `allEvents`, `currentUser`, `allUsers`. UI must manually rebuild via `setState`.
+- **`UserRole` enum**: `guest → verifiedUser → imam → admin`. The MVP roadmap adds **Normal Muqtaddi → Verification Request → Verified Muqtaddi (approval-required | full event permission)** + separately **Imam/Admin**.
+- **Data flow**: Firestore → Repository/Service → Provider (ChangeNotifier) → UI via `context.watch`; mutations via repository / `FirebaseService`.
+- **Real-time**: `FirebaseService.getMasjidStream()` + `QuestionProvider.subscribeToQuestions()` + `EventProvider.subscribeToEvents()`.
+- **Localization**: `appLocalization.t(AppStrings.someKey)` everywhere. RTL toggled by `appLocalization.isRTL` + a `Directionality` wrapper in `main.dart`.
+- **Theming**: `ColorPalette.primary` (green), `.secondary` (amber/gold), `.tertiary` (orange), `.success`, `.error`, `.warning`, `.info`, `.lightBorder`, `.darkBorder`. `Theme.of(context).colorScheme.surface` for card backgrounds.
+- **Firestore paths**: `masjids/{id}`, `masjids/{id}/questions/{qid}`, `masjids/{id}/events/{eid}`, top-level `claimRequests/{id}`.
+- **Anonymous auth fallback** in `main.dart`: if no Firebase Auth user, signs in anonymously so Firestore `isSignedIn()` rules pass. MVP roadmap wants this replaced by real email/password auth.
 
-- `lib/models/app_data.dart` — All models (Masjid, PrayerTime, Question, Event, User) and the global AppData class. Read this first to understand the data layer.
-- `lib/services/firebase_service.dart` — All Firestore operations. Hardcoded Firebase web config is in `initialize()` (line 25–31).
-- `lib/screens/main_navigation_screen.dart` — The 4-tab bottom navigation shell.
-- `lib/theme/app_theme.dart` — ColorPalette and ThemeData definitions.
-- `ARCHITECTURE.md` — More detailed architecture documentation with diagrams.
+## Known Issues / TODOs (see `latesttodo.md` for full Phase 1 roadmap)
+
+1. **Sample/mock data**: `AppData.initialize()` (3 fake masjids + fake events) and `FirebaseService.initializeSampleData()` still exist — MUST be removed. Keep ONLY Hassan Masjid in Firestore.
+2. **Auth**: Anonymous auth is the default path. Need email/password register/login for normal Muqtaddis; admin identity should not rely on `masjid.username == email` alone.
+3. **Firestore rules** (`firestore.rules`): admin check reads `masjids/{id}` `.username` field comparing to `request.auth.token.email`. Works only with real email auth (anonymous users can never be admin). Needs verification system (roles: normal/verified muqtaddi, event-permission flags).
+4. **Event categories**: `'Tablighi Jamaat'` must become `'Jammat'` — currently in `community_page.dart` (id `'Tablighi Jamaat'`) and `app_translations.dart` key `tablighi_jamaat`.
+5. **Countdown language**: `prayer_page.dart` shows `"$hours:$minStr hours remaining"` (e.g. `2:30 hours remaining`) — must become `"2 hours remaining"` / `"50 minutes remaining"` with singular/plural.
+6. **Bottom nav label**: `main_navigation_screen.dart` uses `AppStrings.prayerTimes` ("Prayer Times") for tab 1 — must be shortened to "Time".
+7. **Prayer names/masjid names**: no Urdu translations stored in Firestore yet (prayer name, masjid name). Structure is `list<{name, time}>` per masjid.
+8. **Profile UI**: `settings_page.dart` has a basic profile card only. Needs role/verification status/event permission/verification request UI.
+9. **Placeholder config**: `lib/firebase_options.dart` has PLACEHOLDER values for android/ios/macos/etc. Only `web` is fully configured. Android works because `google-services.json` handles native init.
+10. **`authenticateAdmin()`** in `firebase_service.dart` queries `masjids.where('username').where('password')` — queries a `password` field that the rules reject and that doesn't exist. Dead/legacy code.
+11. **HomeScreen** is legacy/unused (main nav uses PrayerPage + CommunityPage + QuestionsPage + SettingsPage).
+
+## Firebase Auth State Mapping (AuthProvider)
+
+- `_onAuthStateChanged`: firebaseUser == null → guest `app.User`; else builds `app.User(role: verifiedUser, isLoggedIn: true)`.
+- `signInWithGoogle()` is gated to admins: reads ID-token custom claims (`admin`/`imam`/`superadmin`) — a plain Google login does NOT become admin.
+- `EditProfileScreen` handles password change with `reauthenticateWithCredential`.
+
+## Testing & Deployment Notes
+
+- No automated test suite exists. `flutter analyze` is the main static check.
+- Redmi 12C (Android 14, API 34, 720x1650) is the primary test device via ADB.
+- Playwright MCP is configured for Flutter-web UI verification (screenshots in repo root: `*.png`).
+- Streamline MCP is configured for app icons/branding.
+
+## Starter reminder
+
+1. Read `latesttodo.md` — it is the authoritative Phase 1 MVP roadmap and drives all feature work.
+2. Verify against REAL Firestore (`masjid-prayer-app-49f50`), never against hardcoded `AppData` defaults.
+3. Before declaring any feature done, prove data lands in Firestore and survives restart.

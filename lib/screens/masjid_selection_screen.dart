@@ -21,7 +21,11 @@ class _MasjidSelectionScreenState extends State<MasjidSelectionScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeLocationAndMasjids();
+    // Defer past the first frame: requestLocation() notifies synchronously,
+    // which would otherwise trigger "setState() called during build".
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _initializeLocationAndMasjids();
+    });
   }
 
   /// Initialize location and fetch nearby masjids

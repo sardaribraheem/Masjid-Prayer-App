@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/app_data.dart';
 import '../repositories/event_repository.dart';
@@ -6,6 +7,8 @@ import '../repositories/event_repository.dart';
 /// Wraps EventRepository and provides reactive state for the UI.
 class EventProvider extends ChangeNotifier {
   final EventRepository _repository = EventRepository();
+
+  StreamSubscription<List<Event>>? _streamSub;
 
   List<Event> _events = [];
   bool _isLoading = false;
@@ -36,12 +39,24 @@ class EventProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Listen to real-time updates for events
-  void subscribeToEvents(String masjidId) {
-    _repository.getEventsStream(masjidId).listen((events) {
+  /// Listen to real-time updates for events. Cancels any prior subscription
+  /// (tab switching recreates pages) and returns the new subscription so the
+  /// caller can cancel it in dispose().
+  StreamSubscription<List<Event>> subscribeToEvents(String masjidId) {
+    _streamSub?.cancel();
+    final sub = _repository.getEventsStream(masjidId).listen((events) {
       _events = events;
+      _error = null;
       notifyListeners();
     });
+    _streamSub = sub;
+    return sub;
+  }
+
+  @override
+  void dispose() {
+    _streamSub?.cancel();
+    super.dispose();
   }
 
   /// Add a new event

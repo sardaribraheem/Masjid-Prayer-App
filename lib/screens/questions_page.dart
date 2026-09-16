@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/app_data.dart';
@@ -20,10 +21,24 @@ class _QuestionsPageState extends State<QuestionsPage> {
   final TextEditingController _questionController = TextEditingController();
   String _filterType = 'all'; // 'all', 'answered', 'unanswered'
 
+  StreamSubscription<List<Question>>? _questionSub;
+
   @override
   void initState() {
     super.initState();
-    _loadQuestions();
+    // Defer past the first frame: loadQuestions()/subscribeToQuestions() notify
+    // synchronously, which would otherwise trigger "setState() called during
+    // build". Subscribing here (not in build) also avoids creating a new
+    // Firestore listener on every rebuild.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _loadQuestions();
+      final masjidId = AppData.selectedMasjid?.id ?? '';
+      if (masjidId.isNotEmpty) {
+        _questionSub =
+            context.read<QuestionProvider>().subscribeToQuestions(masjidId);
+      }
+    });
   }
 
   Future<void> _loadQuestions() async {
@@ -35,6 +50,7 @@ class _QuestionsPageState extends State<QuestionsPage> {
 
   @override
   void dispose() {
+    _questionSub?.cancel();
     _nameController.dispose();
     _questionController.dispose();
     super.dispose();
