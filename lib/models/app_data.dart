@@ -1,18 +1,95 @@
-/// User role enumeration for role-based access control
+/// User role enumeration for role-based access control.
+///
+/// Mirrors `latesttodo.md` §3 — there are two separate tracks:
+///   Normal Muqtaddi → Verification Request → Verified Muqtaddi
+///        (event approval-required OR full event permission)
+/// and separately: Imam / Admin.
+/// `superadmin` lives in Firebase Auth custom claims, not in the Firestore
+/// `users/{uid}` document.
 enum UserRole {
-  guest,        // No authentication, read-only access
-  verifiedUser, // Can post questions, basic access
-  imam,         // Can edit prayer times, answer questions, manage events
-  admin,        // Full system access
+  guest,
+  muqtaddi,
+  verifiedMuqtaddi,
+  imam,
+  admin;
+
+  String get value => switch (this) {
+        UserRole.guest => 'guest',
+        UserRole.muqtaddi => 'muqtaddi',
+        UserRole.verifiedMuqtaddi => 'verified_muqtaddi',
+        UserRole.imam => 'imam',
+        UserRole.admin => 'admin',
+      };
+
+  static UserRole fromValue(String? v) {
+    for (final role in UserRole.values) {
+      if (role.value == v) return role;
+    }
+    return UserRole.guest;
+  }
 }
 
-/// Represents an app user with role and authentication info
+/// Verification status of a muqtaddi (`latesttodo.md` §2).
+/// `none`      — not applied (default for new accounts)
+/// `pending`   — verification requested, awaiting admin/imam review
+/// `approved`  — verified muqtaddi
+/// `rejected`  — request denied (may re-apply)
+enum VerificationStatus {
+  none,
+  pending,
+  approved,
+  rejected;
+
+  String get value => switch (this) {
+        VerificationStatus.none => 'none',
+        VerificationStatus.pending => 'pending',
+        VerificationStatus.approved => 'approved',
+        VerificationStatus.rejected => 'rejected',
+      };
+
+  static VerificationStatus fromValue(String? v) {
+    for (final s in VerificationStatus.values) {
+      if (s.value == v) return s;
+    }
+    return VerificationStatus.none;
+  }
+}
+
+/// Event-posting permission for a verified muqtaddi (`latesttodo.md` §3).
+/// Kept separate from verification: being verified does NOT grant any of
+/// these automatically.
+enum EventPermission {
+  none,
+  approvalRequired,
+  full;
+
+  String get value => switch (this) {
+        EventPermission.none => 'none',
+        EventPermission.approvalRequired => 'approval_required',
+        EventPermission.full => 'full',
+      };
+
+  static EventPermission fromValue(String? v) {
+    for (final p in EventPermission.values) {
+      if (p.value == v) return p;
+    }
+    return EventPermission.none;
+  }
+}
+
+/// Represents an app user with role, verification and authentication info.
+///
+/// The Firestore document for a user lives at `users/{uid}` and is the
+/// source of truth for `role`, `verificationStatus` and `eventPermission`.
+/// `password` is NEVER stored — Firebase Auth owns credentials (`§10`).
 class User {
-  String id;
-  String username;
-  String? password;
+  String id; // Firebase Auth UID
+  String username; // Display name
+  String email;
   UserRole role;
-  String? masjidId;    // Admin/Imam users are associated with a masjid
+  VerificationStatus verificationStatus;
+  EventPermission eventPermission;
+  String? masjidId; // Associated masjid (if any)
   String? masjidName;
   bool isLoggedIn;
   DateTime? lastLogin;
@@ -21,8 +98,10 @@ class User {
   User({
     required this.id,
     required this.username,
-    this.password,
+    this.email = '',
     required this.role,
+    this.verificationStatus = VerificationStatus.none,
+    this.eventPermission = EventPermission.none,
     this.masjidId,
     this.masjidName,
     this.isLoggedIn = false,
@@ -30,46 +109,64 @@ class User {
     this.createdAt,
   });
 
-  /// Check if user has permission to edit content
-  bool get canEdit => role == UserRole.admin || role == UserRole.imam;
+  /// Is this user an admin/imam (management track)?
+  bool get isAdminOrImam =>
+      role == UserRole.admin || role == UserRole.imam;
+
+  /// Is this user verified?
+  bool get isVerified => verificationStatus == VerificationStatus.approved;
 
   /// Check if user has permission to post questions
   bool get canPostQuestion => role != UserRole.guest;
 
   /// Check if user has permission to answer questions
-  bool get canAnswerQuestion => role == UserRole.imam || role == UserRole.admin;
+  bool get canAnswerQuestion => isAdminOrImam;
 
-  /// Check if user has permission to manage events
-  bool get canManageEvents => role == UserRole.imam || role == UserRole.admin;
+  /// Check if user has permission to manage (create/edit/delete) any event
+  bool get canManageEvents => isAdminOrImam;
 
-  /// Check if user has permission to manage prayer times
-  bool get canEditPrayerTimes => role == UserRole.imam || role == UserRole.admin;
+  /// Check if user has permission to edit prayer times
+  bool get canEditPrayerTimes => isAdminOrImam;
 
-  /// Convert User to JSON
+  /// Can submit events at all (never public for plain muqtaddis/guests).
+  bool get canSubmitEvents =>
+      isAdminOrImam || (role == UserRole.verifiedMuqtaddi && isVerified);
+
+  /// Can publish an event directly without individual approval.
+  /// Verified muqtaddis need `EventPermission.full` (granted by admin).
+  bool get canPublishEventsDirectly =>
+      isAdminOrImam ||
+      (role == UserRole.verifiedMuqtaddi &&
+          isVerified &&
+          eventPermission == EventPermission.full);
+
+  /// Convert User to a Firestore `users/{uid}` document.
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
       'username': username,
-      'password': password,
-      'role': role.toString().split('.').last,
+      'email': email,
+      'role': role.value,
+      'verificationStatus': verificationStatus.value,
+      'eventPermission': eventPermission.value,
       'masjidId': masjidId,
       'masjidName': masjidName,
-      'isLoggedIn': isLoggedIn,
       'lastLogin': lastLogin?.toIso8601String(),
       'createdAt': createdAt?.toIso8601String(),
     };
   }
 
-  /// Create User from JSON
+  /// Create User from a Firestore `users/{uid}` document.
   factory User.fromJson(Map<String, dynamic> json) {
-    final roleString = json['role'] as String? ?? 'guest';
     return User(
       id: json['id'] as String? ?? '',
       username: json['username'] as String? ?? '',
-      password: json['password'] as String?,
-      role: UserRole.values.firstWhere(
-        (e) => e.toString().split('.').last == roleString,
-        orElse: () => UserRole.guest,
+      email: json['email'] as String? ?? '',
+      role: UserRole.fromValue(json['role'] as String?),
+      verificationStatus: VerificationStatus.fromValue(
+        json['verificationStatus'] as String?,
+      ),
+      eventPermission: EventPermission.fromValue(
+        json['eventPermission'] as String?,
       ),
       masjidId: json['masjidId'] as String?,
       masjidName: json['masjidName'] as String?,
@@ -84,17 +181,19 @@ class User {
   }
 }
 
-/// Represents a single prayer (like Fajr) and its time
+/// Represents a single prayer (like Fajr) and its time.
 class PrayerTime {
-  String name;
-  String time;
+  String name; // English name, e.g. "Fajr"
+  String nameUrdu; // Urdu name, e.g. "فجر"
+  String time; // e.g. "5:30 AM"
 
-  PrayerTime({required this.name, required this.time});
+  PrayerTime({required this.name, required this.time, this.nameUrdu = ''});
 
   /// Convert PrayerTime to JSON for Firestore
   Map<String, dynamic> toJson() {
     return {
       'name': name,
+      'nameUrdu': nameUrdu,
       'time': time,
     };
   }
@@ -103,17 +202,19 @@ class PrayerTime {
   factory PrayerTime.fromJson(Map<String, dynamic> json) {
     return PrayerTime(
       name: json['name'] as String? ?? '',
+      nameUrdu: json['nameUrdu'] as String? ?? '',
       time: json['time'] as String? ?? '',
     );
   }
 }
 
-/// Represents a Masjid document in Firestore
+/// Represents a Masjid document in Firestore.
 class Masjid {
   String id; // Firestore document ID
-  String name;
+  String name; // English name
+  String nameUrdu; // Urdu name (§7)
   String location;
-  String username; // For admin login
+  String username; // Legacy admin-login identifier (not a credential)
   List<PrayerTime> prayerTimes;
   String? jummahTime; // Optional Jummah time
   DateTime? lastUpdated;
@@ -124,6 +225,7 @@ class Masjid {
   Masjid({
     this.id = '',
     required this.name,
+    this.nameUrdu = '',
     required this.location,
     this.username = '',
     required this.prayerTimes,
@@ -138,6 +240,7 @@ class Masjid {
   Map<String, dynamic> toJson() {
     return {
       'name': name,
+      'nameUrdu': nameUrdu,
       'location': location,
       'username': username,
       'prayerTimes': prayerTimes.map((p) => p.toJson()).toList(),
@@ -158,6 +261,7 @@ class Masjid {
     return Masjid(
       id: docId,
       name: data['name'] as String? ?? '',
+      nameUrdu: data['nameUrdu'] as String? ?? '',
       location: data['location'] as String? ?? '',
       username: data['username'] as String? ?? '',
       prayerTimes: prayerTimes,
@@ -171,7 +275,7 @@ class Masjid {
   }
 }
 
-/// Represents a Question posted by a user
+/// Represents a Question posted by a user.
 class Question {
   String id;
   String userName;
@@ -220,6 +324,27 @@ class Question {
   }
 }
 
+/// Publication status of an event (`latesttodo.md` §3/§8).
+/// Only `approved` events are publicly visible.
+enum EventStatus {
+  pending,
+  approved,
+  rejected;
+
+  String get value => switch (this) {
+        EventStatus.pending => 'pending',
+        EventStatus.approved => 'approved',
+        EventStatus.rejected => 'rejected',
+      };
+
+  static EventStatus fromValue(String? v) {
+    for (final s in EventStatus.values) {
+      if (s.value == v) return s;
+    }
+    return EventStatus.approved; // Backwards-compatible default for old docs
+  }
+}
+
 /// Represents a Masjid Event (classes, talks, gatherings, etc.)
 class Event {
   String id;
@@ -231,7 +356,10 @@ class Event {
   String startTime; // Format: "2:00 PM"
   String endTime; // Format: "3:30 PM"
   String? location; // Event location (e.g., "Main Hall", "Basement")
-  String? category; // Event category (e.g., "Class", "Talk", "Gathering")
+  String? category; // Event category (e.g., "Class", "Talk", "Jammat")
+  EventStatus status; // pending/approved/rejected — only approved is public
+  String? createdByUid;
+  String? createdByName;
 
   Event({
     required this.id,
@@ -244,7 +372,12 @@ class Event {
     required this.endTime,
     this.location,
     this.category,
+    this.status = EventStatus.approved,
+    this.createdByUid,
+    this.createdByName,
   });
+
+  bool get isApproved => status == EventStatus.approved;
 
   /// Convert Event to JSON
   Map<String, dynamic> toJson() {
@@ -259,6 +392,9 @@ class Event {
       'endTime': endTime,
       'location': location,
       'category': category,
+      'status': status.value,
+      'createdByUid': createdByUid,
+      'createdByName': createdByName,
     };
   }
 
@@ -277,18 +413,25 @@ class Event {
       endTime: json['endTime'] as String? ?? '00:00 AM',
       location: json['location'] as String?,
       category: json['category'] as String?,
+      status: EventStatus.fromValue(json['status'] as String?),
+      createdByUid: json['createdByUid'] as String?,
+      createdByName: json['createdByName'] as String?,
     );
   }
 }
 
-/// Global app state - stores data we need everywhere
+/// Global app state - stores data we need everywhere.
+///
+/// NOTE: `AppData` is a static cache. Firebase is the single source of truth;
+/// these lists are hydrated from Firestore and must NOT contain hardcoded
+/// sample data (`latesttodo.md` §1).
 class AppData {
   static Masjid? selectedMasjid; // Which masjid the user selected
   static List<Masjid> allMasjids = []; // List of all masjids in the system
   static String? selectedMasjidId; // ID of selected masjid for persistence
   static List<Question> allQuestions = []; // All questions posted by users
   static List<Event> allEvents = []; // All events from all masjids
-  
+
   // User/Role Management
   static User currentUser = User(
     id: 'user_guest',
@@ -296,107 +439,6 @@ class AppData {
     role: UserRole.guest,
     isLoggedIn: false,
   ); // Current logged-in user (default: guest)
-  static List<User> allUsers = []; // All app users (admin/imam accounts)
-
-  /// Initialize with 3 hardcoded masjids (for testing without Firebase)
-  static void initialize() {
-    allMasjids = [
-      Masjid(
-        id: 'masjid_1',
-        name: 'Central Masjid',
-        location: 'Downtown',
-        username: 'admin1',
-        prayerTimes: [
-          PrayerTime(name: 'Fajr', time: '5:30 AM'),
-          PrayerTime(name: 'Dhuhr', time: '12:45 PM'),
-          PrayerTime(name: 'Asr', time: '3:30 PM'),
-          PrayerTime(name: 'Maghrib', time: '6:15 PM'),
-          PrayerTime(name: 'Isha', time: '7:45 PM'),
-        ],
-        jummahTime: '1:00 PM',
-      ),
-      Masjid(
-        id: 'masjid_2',
-        name: 'New Mosque',
-        location: 'Uptown',
-        username: 'admin2',
-        prayerTimes: [
-          PrayerTime(name: 'Fajr', time: '5:25 AM'),
-          PrayerTime(name: 'Dhuhr', time: '12:50 PM'),
-          PrayerTime(name: 'Asr', time: '3:35 PM'),
-          PrayerTime(name: 'Maghrib', time: '6:20 PM'),
-          PrayerTime(name: 'Isha', time: '7:50 PM'),
-        ],
-        jummahTime: '1:15 PM',
-      ),
-      Masjid(
-        id: 'masjid_3',
-        name: 'Green Valley Mosque',
-        location: 'Eastside',
-        username: 'admin3',
-        prayerTimes: [
-          PrayerTime(name: 'Fajr', time: '5:35 AM'),
-          PrayerTime(name: 'Dhuhr', time: '12:40 PM'),
-          PrayerTime(name: 'Asr', time: '3:25 PM'),
-          PrayerTime(name: 'Maghrib', time: '6:10 PM'),
-          PrayerTime(name: 'Isha', time: '7:40 PM'),
-        ],
-        jummahTime: '12:45 PM',
-      ),
-    ];
-
-    /// Add sample events for demonstration
-    allEvents = [
-      Event(
-        id: 'evt_1',
-        title: 'Qur\'an Recitation Class',
-        description: 'Weekly Qur\'an recitation and tajweed class for adults',
-        masjidId: 'masjid_1',
-        masjidName: 'Central Masjid',
-        eventDate: DateTime.now().add(const Duration(days: 2)),
-        startTime: '7:00 PM',
-        endTime: '8:30 PM',
-        location: 'Main Hall',
-        category: 'Class',
-      ),
-      Event(
-        id: 'evt_2',
-        title: 'Islamic Finance Workshop',
-        description: 'Understanding halal investments and Islamic banking',
-        masjidId: 'masjid_1',
-        masjidName: 'Central Masjid',
-        eventDate: DateTime.now().add(const Duration(days: 5)),
-        startTime: '2:00 PM',
-        endTime: '4:00 PM',
-        location: 'Conference Room',
-        category: 'Talk',
-      ),
-      Event(
-        id: 'evt_3',
-        title: 'Youth Gathering',
-        description: 'Social and spiritual gathering for young adults',
-        masjidId: 'masjid_2',
-        masjidName: 'New Mosque',
-        eventDate: DateTime.now().add(const Duration(days: 3)),
-        startTime: '6:00 PM',
-        endTime: '8:00 PM',
-        location: 'Basement',
-        category: 'Gathering',
-      ),
-      Event(
-        id: 'evt_4',
-        title: 'Hadith Study Circle',
-        description: 'Daily Hadith explanation and discussion',
-        masjidId: 'masjid_3',
-        masjidName: 'Green Valley Mosque',
-        eventDate: DateTime.now().add(const Duration(days: 1)),
-        startTime: '8:00 PM',
-        endTime: '9:00 PM',
-        location: 'Prayer Hall',
-        category: 'Class',
-      ),
-    ];
-  }
 
   /// Add a new question posted by a user
   static void addQuestion(String userName, String questionText, String masjidId) {
@@ -472,60 +514,10 @@ class AppData {
   /// Get events sorted by distance from selected masjid
   static List<Event> getEventsSortedByDistance() {
     if (selectedMasjid == null) return getUpcomingEvents();
-    return getUpcomingEvents();  // Can be enhanced with actual distance calculation later
+    return getUpcomingEvents(); // Can be enhanced with actual distance calculation later
   }
 
-  // ============ User/Role Management Methods ============
-
-  /// Initialize admin/imam users for each masjid
-  static void initializeUsers() {
-    allUsers = [
-      User(
-        id: 'admin_masjid_1',
-        username: 'admin1',
-        password: 'pass123',
-        role: UserRole.imam,
-        masjidId: 'masjid_1',
-        masjidName: 'Central Masjid',
-        createdAt: DateTime.now(),
-      ),
-      User(
-        id: 'admin_masjid_2',
-        username: 'admin2',
-        password: 'pass456',
-        role: UserRole.imam,
-        masjidId: 'masjid_2',
-        masjidName: 'New Mosque',
-        createdAt: DateTime.now(),
-      ),
-      User(
-        id: 'admin_masjid_3',
-        username: 'admin3',
-        password: 'pass789',
-        role: UserRole.imam,
-        masjidId: 'masjid_3',
-        masjidName: 'Green Valley Mosque',
-        createdAt: DateTime.now(),
-      ),
-    ];
-  }
-
-  /// Login user - return true if credentials are valid
-  static bool login(String username, String password) {
-    try {
-      final user = allUsers.firstWhere(
-        (u) => u.username == username && u.password == password,
-      );
-      currentUser = user;
-      currentUser.isLoggedIn = true;
-      currentUser.lastLogin = DateTime.now();
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  /// Logout current user
+  /// Reset the current user to the guest default (used on logout).
   static void logout() {
     currentUser = User(
       id: 'user_guest',
@@ -533,39 +525,5 @@ class AppData {
       role: UserRole.guest,
       isLoggedIn: false,
     );
-  }
-
-  /// Change password for a user
-  static bool changePassword(String username, String oldPassword, String newPassword) {
-    try {
-      final userIndex = allUsers.indexWhere(
-        (u) => u.username == username && u.password == oldPassword,
-      );
-      if (userIndex != -1) {
-        allUsers[userIndex].password = newPassword;
-        // If this is the current user, update their password too
-        if (currentUser.username == username) {
-          currentUser.password = newPassword;
-        }
-        return true;
-      }
-      return false;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  /// Get user by username
-  static User? getUserByUsername(String username) {
-    try {
-      return allUsers.firstWhere((u) => u.username == username);
-    } catch (e) {
-      return null;
-    }
-  }
-
-  /// Get all users for a specific masjid
-  static List<User> getUsersByMasjid(String masjidId) {
-    return allUsers.where((u) => u.masjidId == masjidId).toList();
   }
 }

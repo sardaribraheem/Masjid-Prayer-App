@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:provider/provider.dart';
 import '../models/app_data.dart';
+import '../providers/auth_provider.dart';
 import '../providers/settings_provider.dart';
 import '../l10n/app_localization.dart';
 import '../l10n/app_strings.dart';
@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import 'admin_login_screen.dart';
 import 'edit_profile_screen.dart';
 import 'masjid_selection_screen.dart';
+import 'muqtaddi_login_screen.dart';
 
 /// Settings Page - Account, profile, preferences
 class SettingsPage extends StatefulWidget {
@@ -19,15 +20,31 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  final auth.FirebaseAuth _firebaseAuth = auth.FirebaseAuth.instance;
+  /// Human-readable role label for the profile card. Admins/imams and verified
+  /// muqtaddis get their elevated label; a plain muqtaddi is shown as-is.
+  String _roleLabel(User? user) {
+    if (user == null) return appLocalization.t(AppStrings.guest);
+    return switch (user.role) {
+      UserRole.guest => appLocalization.t(AppStrings.guest),
+      UserRole.muqtaddi => user.isVerified
+          ? appLocalization.t(AppStrings.verifiedUser)
+          : appLocalization.t(AppStrings.muqtaddi),
+      UserRole.verifiedMuqtaddi => appLocalization.t(AppStrings.verifiedUser),
+      UserRole.imam || UserRole.admin => appLocalization.t(AppStrings.imam),
+    };
+  }
+
+  /// True for management-track or verified users (used for role label color).
+  bool _isElevated(User? user) =>
+      user != null && (user.isAdminOrImam || user.isVerified);
 
   @override
   Widget build(BuildContext context) {
-    final currentUser = _firebaseAuth.currentUser;
-    final isLoggedIn = currentUser != null;
+    final authProvider = context.watch<AuthProvider>();
+    final isLoggedIn = authProvider.isLoggedIn;
     final displayName =
-        currentUser?.displayName ?? currentUser?.email ?? 'Guest';
-    final email = currentUser?.email ?? '';
+        authProvider.currentUser?.username ?? 'Guest';
+    final email = authProvider.currentUser?.email ?? '';
 
     return Scaffold(
       appBar: AppBar(
@@ -100,29 +117,64 @@ class _SettingsPageState extends State<SettingsPage> {
                                   color: ColorPalette.lightTextSecondary,
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              if (!isLoggedIn)
-                                ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const AdminLoginScreen(),
-                                      ),
-                                    );
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: ColorPalette.primary,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 6,
+                              if (isLoggedIn)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(
+                                    _roleLabel(authProvider.currentUser),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: _isElevated(
+                                          authProvider.currentUser)
+                                          ? ColorPalette.success
+                                          : ColorPalette.warning,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
-                                  child: Text(
-                                    appLocalization.t(AppStrings.login),
-                                    style: const TextStyle(fontSize: 12),
-                                  ),
+                                ),
+                              const SizedBox(height: 8),
+                              if (!isLoggedIn)
+                                Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    ElevatedButton(
+                                      onPressed: () async {
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const MuqtaddiLoginScreen(),
+                                          ),
+                                        );
+                                        if (mounted) setState(() {});
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: ColorPalette.primary,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 8,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        appLocalization.t(
+                                            AppStrings.login),
+                                        style: const TextStyle(fontSize: 12),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      appLocalization.t(
+                                        AppStrings
+                                            .guestCanReadLoginToParticipate,
+                                      ),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontStyle: FontStyle.italic,
+                                        color: ColorPalette.lightTextSecondary,
+                                      ),
+                                    ),
+                                  ],
                                 )
                               else
                                 Row(
@@ -157,7 +209,9 @@ class _SettingsPageState extends State<SettingsPage> {
                                     const SizedBox(width: 8),
                                     ElevatedButton.icon(
                                       onPressed: () async {
-                                        await _firebaseAuth.signOut();
+                                        await context
+                                            .read<AuthProvider>()
+                                            .signOut();
                                         if (mounted) setState(() {});
                                       },
                                       icon: const Icon(Icons.logout, size: 14),

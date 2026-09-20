@@ -19,6 +19,7 @@ class AppTranslations {
 
       // Prayer Times
       'next_prayer': 'Next Prayer',
+      'time': 'Time',
       'all_prayers': 'All Prayers',
       'fajr': 'Fajr',
       'dhuhr': 'Dhuhr',
@@ -28,6 +29,8 @@ class AppTranslations {
       'jummah': 'Jummah',
       'minutes_remaining': 'minutes remaining',
       'hours_remaining': 'hours remaining',
+      'minute_remaining': 'minute remaining',
+      'hour_remaining': 'hour remaining',
       'prayer_time': 'Prayer Time',
       'edit_prayer_times': 'Edit Prayer Times',
       'save_prayer_times': 'Save Prayer Times',
@@ -49,7 +52,7 @@ class AppTranslations {
       'event_category': 'Category',
       'taleem': 'Taleem',
       'dars': 'Dars',
-      'tablighi_jamaat': 'Tablighi Jamaat',
+      'jammat': 'Jammat',
       'gasht': 'Gasht',
       'other': 'Other',
       'all_categories': 'All',
@@ -94,6 +97,7 @@ class AppTranslations {
       'my_role': 'My Role',
       'guest': 'Guest',
       'verified_user': 'Verified User',
+      'muqtaddi': 'Muqtaddi',
       'imam': 'Imam/Admin',
 
       // Admin Panel
@@ -132,6 +136,21 @@ class AppTranslations {
       'create_admin_account': 'Create an admin account to manage prayer times',
       'must_be_unique': 'Must be unique',
       'at_least_6': 'At least 6 characters',
+
+      // Muqtaddi Auth (latesttodo §2, §10)
+      'muqtaddi_login_title': 'Muqtaddi Login',
+      'muqtaddi_register_title': 'Create Account',
+      'login_subtitle': 'Sign in to your account',
+      'register_subtitle': 'Join your masjid community',
+      'register_success_msg': 'Account created. Welcome!',
+      'full_name': 'Full Name',
+      'enter_full_name': 'Enter your full name',
+      'dont_have_account': 'Don\'t have an account?',
+      'already_have_account': 'Already have an account?',
+      'create_account': 'Create Account',
+      'sign_in': 'Sign In',
+      'guest_can_read_login_to_participate':
+          'You are browsing as a guest. Log in to ask questions and contribute.',
 
       // Admin Panel
       'no_masjid_selected_admin': 'No masjid selected. Please log in again.',
@@ -263,6 +282,7 @@ class AppTranslations {
 
       // Prayer Times
       'next_prayer': 'اگلی نماز',
+      'time': 'وقت',
       'all_prayers': 'تمام نمازیں',
       'fajr': 'فجر',
       'dhuhr': 'ظہر',
@@ -272,6 +292,8 @@ class AppTranslations {
       'jummah': 'جمعہ',
       'minutes_remaining': 'منٹ باقی',
       'hours_remaining': 'گھنٹے باقی',
+      'minute_remaining': 'منٹ باقی',
+      'hour_remaining': 'گھنٹہ باقی',
       'prayer_time': 'نماز کا وقت',
       'edit_prayer_times': 'نماز کے اوقات میں ترمیم کریں',
       'save_prayer_times': 'نماز کے اوقات محفوظ کریں',
@@ -293,7 +315,7 @@ class AppTranslations {
       'event_category': 'زمرہ',
       'taleem': 'تعلیم',
       'dars': 'درس',
-      'tablighi_jamaat': 'تبلیغی جماعت',
+      'jammat': 'جماعت',
       'gasht': 'گشت',
       'other': 'دوسرا',
       'all_categories': 'تمام',
@@ -338,6 +360,7 @@ class AppTranslations {
       'my_role': 'میرا کردار',
       'guest': 'مہمان',
       'verified_user': 'تصدیق شدہ صارف',
+      'muqtaddi': 'مقتدی',
       'imam': 'امام/ایڈمن',
 
       // Admin Panel
@@ -384,6 +407,21 @@ class AppTranslations {
       'error_saving_prayer_times': 'نماز کے اوقات محفوظ کرتے ہوئے خرابی',
       'qna_management': 'Q&A مینجمنٹ',
       'change_masjid_admin': 'مسجد تبدیل کریں',
+
+      // Muqtaddi Auth
+      'muqtaddi_login_title': 'مفتی لاگ ان',
+      'muqtaddi_register_title': 'اکاؤنٹ بنائیں',
+      'login_subtitle': 'اپنے اکاؤنٹ میں سائن ان کریں',
+      'register_subtitle': 'اپنی مسجد کمیونٹی میں شامل ہوں',
+      'register_success_msg': 'اکاؤنٹ بن گیا۔ خوش آمدید!',
+      'full_name': 'پورا نام',
+      'enter_full_name': 'اپنا پورا نام درج کریں',
+      'dont_have_account': 'اکاؤنٹ نہیں ہے؟',
+      'already_have_account': 'پہلے سے اکاؤنٹ ہے؟',
+      'create_account': 'اکاؤنٹ بنائیں',
+      'sign_in': 'سائن ان کریں',
+      'guest_can_read_login_to_participate':
+          'آپ مہمان کے طور پر دیکھ رہے ہیں۔ سوالات پوچھنے اور شمولیت کے لیے لاگ ان کریں۔',
 
       // Validation & Errors
       'field_required': 'یہ فیلڈ لازمی ہے',

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:provider/provider.dart';
 import 'models/app_data.dart';
 import 'screens/masjid_selection_screen.dart';
@@ -18,7 +17,11 @@ import 'providers/settings_provider.dart';
 
 void main() async {
   // Ensure Flutter bindings are initialized
-  WidgetsFlutterBinding.ensureInitialized();
+  final binding = WidgetsFlutterBinding.ensureInitialized();
+
+  // Enable semantics tree so Playwright/accessibility tools can interact with
+  // the Flutter web CanvasKit renderer (which hides the DOM by default).
+  binding.ensureSemantics();
 
   // Initialize localization
   await appLocalization.initialize();
@@ -30,18 +33,9 @@ void main() async {
   final firebaseService = FirebaseService();
   await firebaseService.initialize();
 
-  // Ensure there is always a Firebase Auth user (anonymous if needed).
-  // This is required so Firestore rules that check isSignedIn() pass for
-  // normal users reading/writing questions and events.
-  try {
-    final currentUser = auth.FirebaseAuth.instance.currentUser;
-    if (currentUser == null) {
-      await auth.FirebaseAuth.instance.signInAnonymously();
-    }
-  } catch (e) {
-    // If anonymous sign-in fails, the app can still function in read-only
-    // mode for publicly readable data, but writes will fail.
-  }
+  // NO anonymous sign-in: a signed-out user is a guest who can read public
+  // data (masjids) and must register/login as a Muqtaddi to write
+  // (`latesttodo.md` §1, §2). Auth state is handled by AuthProvider.
 
   // Check if a masjid was previously selected
   final selectedId = storageService.getSelectedMasjidId();

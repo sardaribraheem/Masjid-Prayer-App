@@ -2,13 +2,19 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/app_data.dart';
+import '../providers/auth_provider.dart';
 import '../providers/question_provider.dart';
 import '../widgets/shared/empty_state.dart';
 import '../l10n/app_localization.dart';
 import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
+import 'muqtaddi_login_screen.dart';
 
 /// Questions Page - Users can ask questions and see answered questions
+///
+/// Only signed-in Muqtaddis can post (`Firestore rules` requires auth); guests
+/// see a login prompt instead of the form. Questions are attributed to the
+/// logged-in user's `users/{uid}` username — no manual name field.
 class QuestionsPage extends StatefulWidget {
   const QuestionsPage({Key? key}) : super(key: key);
 
@@ -17,7 +23,6 @@ class QuestionsPage extends StatefulWidget {
 }
 
 class _QuestionsPageState extends State<QuestionsPage> {
-  final TextEditingController _nameController = TextEditingController();
   final TextEditingController _questionController = TextEditingController();
   String _filterType = 'all'; // 'all', 'answered', 'unanswered'
 
@@ -51,18 +56,15 @@ class _QuestionsPageState extends State<QuestionsPage> {
   @override
   void dispose() {
     _questionSub?.cancel();
-    _nameController.dispose();
     _questionController.dispose();
     super.dispose();
   }
 
   Future<void> _submitQuestion() async {
-    if (_nameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(appLocalization.t(AppStrings.pleaseEnterYourName)),
-        ),
-      );
+    final authProvider = context.read<AuthProvider>();
+    if (!authProvider.isLoggedIn) {
+      // Guests cannot post per Firestore rules — route them to login.
+      await _promptLogin();
       return;
     }
 
@@ -76,11 +78,12 @@ class _QuestionsPageState extends State<QuestionsPage> {
     }
 
     final success = await context.read<QuestionProvider>().addQuestion(
-          userName: _nameController.text.trim(),
+          userName: authProvider.currentUser?.username ?? 'Muqtaddi',
           questionText: _questionController.text.trim(),
           masjidId: AppData.selectedMasjid?.id ?? 'unknown',
         );
 
+    if (!mounted) return;
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -88,10 +91,31 @@ class _QuestionsPageState extends State<QuestionsPage> {
           backgroundColor: ColorPalette.success,
         ),
       );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(appLocalization.t(AppStrings.errorOccurred)),
+          backgroundColor: ColorPalette.error,
+        ),
+      );
     }
 
-    _nameController.clear();
     _questionController.clear();
+  }
+
+  /// Send guests to the Muqtaddi login screen before posting.
+  Future<void> _promptLogin() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          appLocalization.t(AppStrings.guestCanReadLoginToParticipate),
+        ),
+      ),
+    );
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const MuqtaddiLoginScreen()),
+    );
   }
 
   List<Question> _getFilteredQuestions() {
@@ -126,71 +150,99 @@ class _QuestionsPageState extends State<QuestionsPage> {
       body: Column(
         children: [
           // Ask Question Card
-          Container(
-            padding: const EdgeInsets.all(16),
-            color: ColorPalette.primary.withValues(alpha: 0.1),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  appLocalization.t(AppStrings.askTheImam),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: ColorPalette.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _nameController,
-                  decoration: InputDecoration(
-                    hintText: appLocalization.t(AppStrings.yourName),
-                    prefixIcon: Icon(Icons.person, color: ColorPalette.primary),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
+          if (context.watch<AuthProvider>().isLoggedIn)
+            Container(
+              padding: const EdgeInsets.all(16),
+              color: ColorPalette.primary.withValues(alpha: 0.1),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    appLocalization.t(AppStrings.askTheImam),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: ColorPalette.primary,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: _questionController,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    hintText: appLocalization.t(AppStrings.yourQuestion),
-                    prefixIcon: Padding(
-                      padding: const EdgeInsets.only(top: 8, left: 8),
-                      child: Icon(
-                        Icons.help_outline,
-                        color: ColorPalette.primary,
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _questionController,
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      hintText: appLocalization.t(AppStrings.yourQuestion),
+                      prefixIcon: Padding(
+                        padding: const EdgeInsets.only(top: 8, left: 8),
+                        child: Icon(
+                          Icons.help_outline,
+                          color: ColorPalette.primary,
+                        ),
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
                       ),
                     ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _submitQuestion,
+                      icon: const Icon(Icons.send),
+                      label: Text(appLocalization.t(AppStrings.submitQuestion)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ColorPalette.primary,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _submitQuestion,
-                    icon: const Icon(Icons.send),
-                    label: Text(appLocalization.t(AppStrings.submitQuestion)),
+                ],
+              ),
+            )
+          else
+            // Guests read public data but must log in to post (§2).
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              color: ColorPalette.primary.withValues(alpha: 0.1),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    appLocalization.t(AppStrings.askTheImam),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: ColorPalette.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    appLocalization.t(
+                        AppStrings.guestCanReadLoginToParticipate),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: ColorPalette.lightTextSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const MuqtaddiLoginScreen(),
+                      ),
+                    ),
+                    icon: const Icon(Icons.login),
+                    label: Text(appLocalization.t(AppStrings.login)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: ColorPalette.primary,
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
 
           // Filter Tabs
           Padding(

@@ -35,7 +35,7 @@ class EnhancedEventCard extends StatelessWidget {
         return Icons.school;
       case 'dars':
         return Icons.book;
-      case 'tablighi jamaat':
+      case 'jammat':
         return Icons.group;
       case 'gasht':
         return Icons.directions_walk;
@@ -50,7 +50,7 @@ class EnhancedEventCard extends StatelessWidget {
         return const Color(0xFF2196F3); // Blue
       case 'dars':
         return const Color(0xFF9C27B0); // Purple
-      case 'tablighi jamaat':
+      case 'jammat':
         return const Color(0xFF4CAF50); // Green
       case 'gasht':
         return const Color(0xFFFF9800); // Orange

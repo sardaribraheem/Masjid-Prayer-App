@@ -492,11 +492,16 @@ class _PrayerPageState extends State<PrayerPage> {
       final hours = diffMinutes ~/ 60;
       final minutes = diffMinutes % 60;
       if (hours == 0) {
-        final minStr = minutes.toString().padLeft(2, '0');
-        return '$minStr ${appLocalization.t(AppStrings.minutesRemaining)}';
+        // Under an hour: "50 minutes remaining" (singular/plural, no padding).
+        final key = minutes == 1
+            ? AppStrings.minuteRemaining
+            : AppStrings.minutesRemaining;
+        return '$minutes ${appLocalization.t(key)}';
       } else {
-        final minStr = minutes.toString().padLeft(2, '0');
-        return '$hours:$minStr ${appLocalization.t(AppStrings.hoursRemaining)}';
+        // Whole hours, rounded down: "2:30" → "2 hours remaining".
+        final key =
+            hours == 1 ? AppStrings.hourRemaining : AppStrings.hoursRemaining;
+        return '$hours ${appLocalization.t(key)}';
       }
     } catch (e) {
       return appLocalization.t(AppStrings.errorOccurred);

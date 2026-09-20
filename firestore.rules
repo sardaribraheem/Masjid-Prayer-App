@@ -75,6 +75,38 @@ service cloud.firestore {
       }
     }
 
+    // ============ USER DOCUMENTS (Muqtaddi accounts, `latesttodo.md` §2) ============
+    // Roles live in `users/{uid}`. A signed-in user can read and manage their
+    // OWN document, but can never self-assign elevated roles: registration
+    // creates a plain `muqtaddi`, and `role` / `verificationStatus` /
+    // `eventPermission` can only be changed by an admin/imam — which the
+    // full §9 rule rewrite models. Until that lands, self-update is limited
+    // to profile/association fields and role fields are immutable.
+    match /users/{userId} {
+      // A user reads their own document (hydrates role on login).
+      allow read: if isSignedIn() && request.auth.uid == userId;
+
+      // Registration: create your own doc, always starting as a plain
+      // `muqtaddi` with no verification and no event permission.
+      allow create: if isSignedIn() &&
+        request.auth.uid == userId &&
+        request.resource.data.role == 'muqtaddi' &&
+        request.resource.data.verificationStatus == 'none' &&
+        request.resource.data.eventPermission == 'none';
+
+      // Self-edit of profile/association fields only; role, verification
+      // and event permission must stay identical to the stored document.
+      allow update: if isSignedIn() &&
+        request.auth.uid == userId &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.verificationStatus ==
+          resource.data.verificationStatus &&
+        request.resource.data.eventPermission ==
+          resource.data.eventPermission &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['username', 'email', 'masjidId', 'masjidName', 'lastLogin']);
+    }
+
     // ============ CLAIM REQUESTS (Super Admin Only) ============
     match /claimRequests/{claimId} {
       allow read: if isSignedIn() &&

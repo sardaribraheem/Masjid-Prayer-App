@@ -63,8 +63,8 @@ class _CommunityPageState extends State<CommunityPage> {
       CategoryItem(id: 'Taleem', label: appLocalization.t(AppStrings.taleem), icon: Icons.school),
       CategoryItem(id: 'Dars', label: appLocalization.t(AppStrings.dars), icon: Icons.book),
       CategoryItem(
-        id: 'Tablighi Jamaat',
-        label: appLocalization.t(AppStrings.tabblighi),
+        id: 'Jammat',
+        label: appLocalization.t(AppStrings.jammat),
         icon: Icons.group,
       ),
       CategoryItem(id: 'Gasht', label: appLocalization.t(AppStrings.gasht), icon: Icons.directions_walk),

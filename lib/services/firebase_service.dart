@@ -131,26 +131,6 @@ class FirebaseService {
     }
   }
 
-  /// Authenticate admin - check username and password
-  Future<Masjid?> authenticateAdmin(String username, String password) async {
-    try {
-      final snapshot = await _firestore
-          .collection('masjids')
-          .where('username', isEqualTo: username)
-          .where('password', isEqualTo: password)
-          .limit(1)
-          .get();
-
-      if (snapshot.docs.isNotEmpty) {
-        return Masjid.fromFirestore(snapshot.docs[0].data(), snapshot.docs[0].id);
-      }
-      return null;
-    } catch (e) {
-      debugPrint('Error authenticating admin: $e');
-      return null;
-    }
-  }
-
   /// Register a new masjid
   Future<bool> registerMasjid(Masjid masjid) async {
     try {
@@ -214,75 +194,4 @@ class FirebaseService {
     }
   }
 
-  /// Initialize sample data in Firestore (for testing)
-  Future<void> initializeSampleData() async {
-    try {
-      final masjidsRef = _firestore.collection('masjids');
-
-      // Check if data already exists
-      final snapshot = await masjidsRef.limit(1).get();
-      if (snapshot.docs.isNotEmpty) {
-        debugPrint('Sample data already exists');
-        return;
-      }
-
-      // Add sample masjids with geographic coordinates
-      // Using sample coordinates (e.g., Karachi, Pakistan)
-      final sampleMasjids = [
-        Masjid(
-          name: 'Central Masjid',
-          location: 'Downtown',
-          username: 'admin1',
-          prayerTimes: [
-            PrayerTime(name: 'Fajr', time: '5:30 AM'),
-            PrayerTime(name: 'Dhuhr', time: '12:45 PM'),
-            PrayerTime(name: 'Asr', time: '3:30 PM'),
-            PrayerTime(name: 'Maghrib', time: '6:15 PM'),
-            PrayerTime(name: 'Isha', time: '7:45 PM'),
-          ],
-          jummahTime: '1:00 PM',
-          latitude: 24.8607,
-          longitude: 67.0011,
-        ),
-        Masjid(
-          name: 'New Mosque',
-          location: 'Uptown',
-          username: 'admin2',
-          prayerTimes: [
-            PrayerTime(name: 'Fajr', time: '5:25 AM'),
-            PrayerTime(name: 'Dhuhr', time: '12:50 PM'),
-            PrayerTime(name: 'Asr', time: '3:35 PM'),
-            PrayerTime(name: 'Maghrib', time: '6:20 PM'),
-            PrayerTime(name: 'Isha', time: '7:50 PM'),
-          ],
-          jummahTime: '1:15 PM',
-          latitude: 24.8620,
-          longitude: 67.0150,
-        ),
-        Masjid(
-          name: 'Green Valley Mosque',
-          location: 'Eastside',
-          username: 'admin3',
-          prayerTimes: [
-            PrayerTime(name: 'Fajr', time: '5:35 AM'),
-            PrayerTime(name: 'Dhuhr', time: '12:40 PM'),
-            PrayerTime(name: 'Asr', time: '3:25 PM'),
-            PrayerTime(name: 'Maghrib', time: '6:10 PM'),
-            PrayerTime(name: 'Isha', time: '7:40 PM'),
-          ],
-          jummahTime: '12:45 PM',
-          latitude: 24.8500,
-          longitude: 67.0300,
-        ),
-      ];
-
-      for (var masjid in sampleMasjids) {
-        await masjidsRef.add(masjid.toJson());
-      }
-
-      debugPrint('Sample data initialized successfully');
-    } catch (e) {
-      debugPrint('Error initializing sample data: $e');
-    }
   }
-}

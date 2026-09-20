@@ -16,6 +16,7 @@ class AppStrings {
   // =========================
   // PRAYER TIMES
   // =========================
+  static const time = 'time';
   static const nextPrayer = 'next_prayer';
   static const allPrayers = 'all_prayers';
   static const fajr = 'fajr';
@@ -26,6 +27,8 @@ class AppStrings {
   static const jummah = 'jummah';
   static const minutesRemaining = 'minutes_remaining';
   static const hoursRemaining = 'hours_remaining';
+  static const minuteRemaining = 'minute_remaining';
+  static const hourRemaining = 'hour_remaining';
   static const prayerTime = 'prayer_time';
   static const editPrayerTimes = 'edit_prayer_times';
   static const savePrayerTimes = 'save_prayer_times';
@@ -49,7 +52,7 @@ class AppStrings {
   static const eventCategory = 'event_category';
   static const taleem = 'taleem';
   static const dars = 'dars';
-  static const tabblighi = 'tablighi_jamaat';
+  static const jammat = 'jammat';
   static const gasht = 'gasht';
   static const other = 'other';
   static const allCategories = 'all_categories';
@@ -98,6 +101,7 @@ class AppStrings {
   static const myRole = 'my_role';
   static const guest = 'guest';
   static const verifiedUser = 'verified_user';
+  static const muqtaddi = 'muqtaddi';
   static const imam = 'imam';
 
   // =========================
@@ -209,6 +213,22 @@ class AppStrings {
   static const questionsWillAppearHereAdmin = 'questions_will_appear_here_admin';
   static const updated = 'updated';
   static const updatedTimeAgo = 'updated_time_ago';
+
+  // =========================
+  // MUQTADDI AUTH
+  // =========================
+  static const muqtaddiLoginTitle = 'muqtaddi_login_title';
+  static const muqtaddiRegisterTitle = 'muqtaddi_register_title';
+  static const loginSubtitle = 'login_subtitle';
+  static const registerSubtitle = 'register_subtitle';
+  static const registerSuccessMsg = 'register_success_msg';
+  static const fullName = 'full_name';
+  static const enterFullName = 'enter_full_name';
+  static const dontHaveAccount = 'dont_have_account';
+  static const alreadyHaveAccount = 'already_have_account';
+  static const createAccount = 'create_account';
+  static const signInButton = 'sign_in';
+  static const guestCanReadLoginToParticipate = 'guest_can_read_login_to_participate';
 
   // =========================
   // MASJID SELECTION

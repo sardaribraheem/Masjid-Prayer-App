@@ -41,7 +41,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         items: [
           BottomNavigationBarItem(
             icon: const Icon(Icons.schedule),
-            label: appLocalization.t(AppStrings.prayerTimes),
+            label: appLocalization.t(AppStrings.time),
           ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.event),

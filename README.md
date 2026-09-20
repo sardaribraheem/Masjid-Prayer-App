@@ -49,23 +49,35 @@ lib/
 
 **Data flow:** Firestore → Repository/Service → Provider → UI (`context.watch`). Real-time updates via `snapshots()` streams underneath the providers.
 
-## Roles (Phase 1 roadmap)
+## Roles (as modeled)
 
 ```
-Normal Muqtaddi  →  Verification Request  →  Verified Muqtaddi
-                                              ├── Event approval required
-                                              └── Full event-posting permission
-Imam / Admin (separate)
+guest → muqtaddi (new account) → verifiedMuqtaddi → imam → admin
 ```
+
+- Registered users start as a plain **Muqtaddi** (`role` stored in Firestore `users/{uid}`, never self-elevated).
+- Roadmap adds: **Verification Request → Verified Muqtaddi** (event approval-required | full event-posting permission) + separate **Imam/Admin** track.
+- Google login does NOT auto-elevate to admin; roles come from the Firestore doc.
 
 ## Current Status
 
 - ✅ App runs on Android (Redmi 12C) and web; prayer times, masjid selection, navigation functional
-- ✅ Anonymous Firebase Auth + Firestore reads/writes working
-- 🚧 In progress: real user accounts (email/password), verification flow, verified-event permissions, sample-data removal, Urdu prayer/masjid names, event category rename, countdown/branding polish — tracked in [`latesttodo.md`](latesttodo.md)
+- ✅ **Hassan Masjid** (`6qkkBODeZ8kLHkNOCjqx`) is patched & clean in Firestore: no `password` field, `nameUrdu=حسن مسجد`, 6 prayers (Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha)
+- ✅ Email/password register + login for normal Muqtaddis (done) — **anonymous auth removed**
+- ✅ Q&A flow verified E2E: ask question → real Firestore doc → survives reload
+- ✅ Playwright UI verification: all 4 pages × light/dark × mobile/desktop × English/Urdu-RTL
+- ✅ Countdown language + bottom-nav "Time" label + Tablighi→Jammat rename (done)
+- 🚧 In progress: delete leftover sample masjid docs, verification flow, verified-event permissions, Urdu *prayer-name* translations, profile/RBAC UI, branding/icons — tracked in [`latesttodo.md`](latesttodo.md)
+
+> ⚠️ **Firestore admin writes (2026-09-16):** the CLI's cached refresh token is invalid
+> (`INVALID_REFRESH_TOKEN`); run `firebase login` to re-auth before any scripted Firestore
+> admin work. Raw REST deletes are also gated by the classifier — name exact doc IDs. The
+> app itself still works against the real project.
 
 ## Dev Notes
 
 - No automated tests yet — `flutter analyze` is the static check.
 - Keep all UI strings in `lib/l10n/` (English + Urdu, RTL-aware).
 - Verify every feature against REAL Firestore before marking it done.
+- **Never store plaintext passwords in Firestore** (Hassan Masjid's `password` field was stripped for exactly this reason).
+- Read `latesttodo.md` first — it is the authoritative Phase 1 roadmap and wears a ⚠️ READ-THIS-FIRST block with the current Firestore-access blocker.
