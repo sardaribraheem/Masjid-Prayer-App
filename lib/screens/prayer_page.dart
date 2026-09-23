@@ -21,6 +21,8 @@ class PrayerPage extends StatefulWidget {
 class _PrayerPageState extends State<PrayerPage> {
   final FirebaseService _firebaseService = FirebaseService();
   late Timer _countdownTimer;
+  Timer? _previewTimer;
+  int? _previewedPrayerIndex;
 
   @override
   void initState() {
@@ -35,7 +37,22 @@ class _PrayerPageState extends State<PrayerPage> {
   @override
   void dispose() {
     _countdownTimer.cancel();
+    _previewTimer?.cancel();
     super.dispose();
+  }
+
+  void _previewPrayer(int index) {
+    _previewTimer?.cancel();
+    setState(() {
+      _previewedPrayerIndex = index;
+    });
+    _previewTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) {
+        setState(() {
+          _previewedPrayerIndex = null;
+        });
+      }
+    });
   }
 
   @override
@@ -131,8 +148,12 @@ class _PrayerPageState extends State<PrayerPage> {
 
           final allPrayers = _getAllPrayersWithJummah(currentMasjid);
           final nextPrayerIndex = _getNextPrayerIndex(allPrayers);
-          final nextPrayer = nextPrayerIndex >= 0
-              ? allPrayers[nextPrayerIndex]
+            final displayedPrayerIndex = _previewedPrayerIndex != null &&
+                _previewedPrayerIndex! < allPrayers.length
+              ? _previewedPrayerIndex!
+              : nextPrayerIndex;
+            final displayedPrayer = displayedPrayerIndex >= 0
+              ? allPrayers[displayedPrayerIndex]
               : allPrayers[0];
 
           return Container(
@@ -157,9 +178,9 @@ class _PrayerPageState extends State<PrayerPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildUpcomingPrayerCard(
-                      nextPrayer,
+                      displayedPrayer,
                       currentMasjid,
-                      nextPrayerIndex,
+                      displayedPrayerIndex,
                     ),
                     const SizedBox(height: 32),
                     Padding(
@@ -322,7 +343,9 @@ class _PrayerPageState extends State<PrayerPage> {
         ? ColorPalette.primary.withValues(alpha: 0.08)
         : const Color.fromRGBO(255, 255, 255, 1).withValues(alpha: 0.7);
 
-    return Container(
+    return GestureDetector(
+      onTap: () => _previewPrayer(index),
+      child: Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         border: isNext
@@ -410,6 +433,7 @@ class _PrayerPageState extends State<PrayerPage> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
