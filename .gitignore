@@ -52,3 +52,8 @@ android/app/google-services.json
 
 # Test/verification screenshots
 *.png
+
+# Local Firebase rule-test dependencies and emulator output
+node_modules/
+.firebase/
+*-debug.log

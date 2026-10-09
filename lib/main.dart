@@ -14,6 +14,7 @@ import 'providers/auth_provider.dart';
 import 'providers/masjid_provider.dart';
 import 'providers/location_provider.dart';
 import 'providers/settings_provider.dart';
+import 'providers/masjid_claim_provider.dart';
 
 void main() async {
   // Ensure Flutter bindings are initialized
@@ -80,6 +81,7 @@ class MyApp extends StatelessWidget {
                 ChangeNotifierProvider(create: (_) => MasjidProvider()),
                 ChangeNotifierProvider(create: (_) => LocationProvider()),
                 ChangeNotifierProvider(create: (_) => SettingsProvider()),
+                ChangeNotifierProvider(create: (_) => MasjidClaimProvider()),
               ],
               child: MaterialApp(
                 title: 'Masjid Prayer App',

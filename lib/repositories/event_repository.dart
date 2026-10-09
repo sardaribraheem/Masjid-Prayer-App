@@ -7,47 +7,55 @@ import '../models/app_data.dart';
 class EventRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// Get a stream of events for a specific masjid
-  Stream<List<Event>> getEventsStream(String masjidId) {
-    return _firestore
+  Query<Map<String, dynamic>> _query(
+    String masjidId, {
+    bool includePending = false,
+  }) {
+    Query<Map<String, dynamic>> query = _firestore
         .collection('masjids')
         .doc(masjidId)
-        .collection('events')
-        .orderBy('eventDate', descending: false)
-        .snapshots()
-        .map((snapshot) {
+        .collection('events');
+    if (!includePending) query = query.where('status', isEqualTo: 'approved');
+    return query.orderBy('eventDate', descending: false);
+  }
+
+  /// Get a stream of events for a specific masjid
+  Stream<List<Event>> getEventsStream(String masjidId) {
+    return _query(masjidId).snapshots().map((snapshot) {
       return snapshot.docs
-          .map((doc) => Event.fromJson(doc.data()))
+          .map((doc) => Event.fromJson({...doc.data(), 'id': doc.id}))
           .toList();
     });
   }
 
   /// Fetch events once
-  Future<List<Event>> getEvents(String masjidId) async {
+  Future<List<Event>> getEvents(
+    String masjidId, {
+    bool includePending = false,
+  }) async {
     try {
-      final snapshot = await _firestore
-          .collection('masjids')
-          .doc(masjidId)
-          .collection('events')
-          .orderBy('eventDate', descending: false)
-          .get();
+      final snapshot = await _query(
+        masjidId,
+        includePending: includePending,
+      ).get();
       return snapshot.docs
-          .map((doc) => Event.fromJson(doc.data()))
+          .map((doc) => Event.fromJson({...doc.data(), 'id': doc.id}))
           .toList();
     } catch (e) {
       debugPrint('Error fetching events: $e');
-      return [];
+      rethrow;
     }
   }
 
   /// Add a new event to a masjid's subcollection
   Future<bool> addEvent(Event event) async {
     try {
-      await _firestore
+      final doc = _firestore
           .collection('masjids')
           .doc(event.masjidId)
           .collection('events')
-          .add(event.toJson());
+          .doc();
+      await doc.set({...event.toJson(), 'id': doc.id});
       return true;
     } catch (e) {
       debugPrint('Error adding event: $e');

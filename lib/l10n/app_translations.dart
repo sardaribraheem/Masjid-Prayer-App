@@ -7,6 +7,33 @@ class AppTranslations {
 
   static const Map<String, Map<String, String>> _translations = {
     'en': {
+      'review_members': 'Review member verification',
+      'no_pending_members': 'No pending member requests.',
+      'verification_review_failed':
+          'Could not review this request. Please retry.',
+      'propose_event': 'Propose an event',
+      'event_proposal_submitted':
+          'Event submitted. Proposals requiring approval appear after review.',
+      'approve': 'Approve',
+      'reject': 'Reject',
+      'delete_account_title': 'Delete account',
+      'delete_account_explanation':
+          'This permanently removes your profile, owned posts and comments, event proposals, and masjid requests. Cleanup may partly complete if interrupted; retry to finish. Masjid managers must arrange a transfer first. Reauthenticate to continue.',
+      'current_password': 'Current password',
+      'deleting_account': 'Deleting…',
+      'account_deleted': 'Account deleted.',
+      'masjid_request_too_long':
+          'Use up to 100 characters for the name and 500 for the location.',
+      'super_admin_access_required': 'Super-admin access is required.',
+      'request_load_failed': 'Could not load requests. Please retry.',
+      'manager_approval_required':
+          'Imam access requires an approved masjid assignment.',
+      'claim_masjid_action': 'Request imam access / register a masjid',
+      'masjid_request_submitted':
+          'Request submitted. Your account will get imam access after approval.',
+      'masjid_request_retry_login':
+          'Request could not be submitted. Sign in with this account and try again from Claim a masjid.',
+      'super_admin_dashboard': 'Review masjid requests',
       // Navigation & Main
       'select_masjid': 'Select Masjid',
       'prayer_times': 'Prayer Times',
@@ -68,7 +95,7 @@ class AppTranslations {
       'ask_question': 'Ask Question',
       'answered': 'Answered',
       'unanswered': 'Unanswered',
-      'your_question': 'Your Question',
+      'your_question': 'Share a hadith, ayat, or question',
       'reply': 'Reply',
       'submit': 'Submit',
       'answer': 'Answer',
@@ -122,7 +149,8 @@ class AppTranslations {
       'enter_your_password': 'Enter your password',
       'invalid_username_or_password': 'Invalid username or password',
       'login_error': 'Login error',
-      'please_enter_username_and_password': 'Please enter username and password',
+      'please_enter_username_and_password':
+          'Please enter username and password',
       'register_new_masjid': 'Register New Masjid',
       'masjid_name': 'Masjid Name',
       'location': 'Location',
@@ -183,15 +211,15 @@ class AppTranslations {
       'please_enter_your_question': 'Please enter your question',
       'answer_question': 'Answer Question',
       'pending': 'Pending',
-      'submit_question': 'Submit Question',
-      'ask_the_imam': 'Ask the Imam',
+      'submit_question': 'Post',
+      'ask_the_imam': 'Share with your community',
       'your_name': 'Your name',
       'community_qa': 'Community Q&A',
       'change': 'Change',
       'enter_your_name': 'Enter your name',
       'posting_to': 'Posting to:',
       'imam_will_review': 'The imam will review and answer your question',
-      'write_your_question': 'Write your question here...',
+      'write_your_question': 'Write a hadith, ayat, or question…',
       'all_questions': 'All Questions',
       'no_questions_yet': 'No questions yet',
       'question_from': 'Question from',
@@ -217,7 +245,8 @@ class AppTranslations {
       'please_set_jummah_time': 'Please set Jummah time',
       'questions_will_appear_here': 'Questions you ask will appear here',
       'events_will_appear_here': 'Events from your masjid will appear here',
-      'questions_will_appear_here_admin': 'Questions from users will appear here',
+      'questions_will_appear_here_admin':
+          'Questions from users will appear here',
       'updated': 'Updated',
       'updated_time_ago': 'ago',
       'submitting': 'Submitting...',
@@ -225,7 +254,8 @@ class AppTranslations {
 
       // Masjid Selection
       'find_nearby_masjid': 'Find Nearby Masjid',
-      'location_permission_required': 'Location permission required to find nearby masjids',
+      'location_permission_required':
+          'Location permission required to find nearby masjids',
       'unable_to_get_your_location': 'Unable to get your location',
       'error_occurred_msg': 'An error occurred',
       'search_masjid_by_name': 'Search masjid by name or location...',
@@ -270,6 +300,33 @@ class AppTranslations {
       'december': 'December',
     },
     'ur': {
+      'review_members': 'ارکان کی تصدیق کا جائزہ',
+      'no_pending_members': 'ارکان کی کوئی زیرِ التوا درخواست نہیں۔',
+      'verification_review_failed':
+          'درخواست کا جائزہ نہیں ہو سکا۔ دوبارہ کوشش کریں۔',
+      'propose_event': 'ایونٹ کی تجویز دیں',
+      'event_proposal_submitted':
+          'ایونٹ جمع ہو گیا۔ منظوری کی ضرورت والی تجاویز جائزے کے بعد نظر آئیں گی۔',
+      'approve': 'منظور کریں',
+      'reject': 'مسترد کریں',
+      'delete_account_title': 'اکاؤنٹ حذف کریں',
+      'delete_account_explanation':
+          'آپ کا پروفائل، پوسٹس، تبصرے، ایونٹ تجاویز اور مسجد کی درخواستیں مستقل حذف ہوں گی۔ عمل رکنے پر دوبارہ کوشش کریں۔ مسجد کے منتظم پہلے ذمہ داری منتقل کروائیں۔ جاری رکھنے کے لیے دوبارہ تصدیق کریں۔',
+      'current_password': 'موجودہ پاس ورڈ',
+      'deleting_account': 'حذف کیا جا رہا ہے…',
+      'account_deleted': 'اکاؤنٹ حذف ہو گیا۔',
+      'masjid_request_too_long':
+          'نام کے لیے 100 اور مقام کے لیے 500 حروف تک استعمال کریں۔',
+      'super_admin_access_required': 'سپر ایڈمن کی رسائی ضروری ہے۔',
+      'request_load_failed': 'درخواستیں لوڈ نہیں ہو سکیں۔ دوبارہ کوشش کریں۔',
+      'manager_approval_required':
+          'امام کی رسائی کے لیے مسجد کی منظور شدہ ذمہ داری ضروری ہے۔',
+      'claim_masjid_action': 'امام کی رسائی یا مسجد کے اندراج کی درخواست',
+      'masjid_request_submitted':
+          'درخواست جمع ہو گئی۔ منظوری کے بعد امام کی رسائی ملے گی۔',
+      'masjid_request_retry_login':
+          'درخواست جمع نہیں ہو سکی۔ اس اکاؤنٹ سے لاگ ان کر کے مسجد کی درخواست دوبارہ دیں۔',
+      'super_admin_dashboard': 'مسجد کی درخواستوں کا جائزہ',
       // Navigation & Main
       'select_masjid': 'مسجد منتخب کریں',
       'prayer_times': 'نماز کے اوقات',
@@ -331,7 +388,7 @@ class AppTranslations {
       'ask_question': 'سوال پوچھیں',
       'answered': 'جواب دیا گیا',
       'unanswered': 'جواب نہیں دیا گیا',
-      'your_question': 'آپ کا سوال',
+      'your_question': 'حدیث، آیت یا سوال لکھیں',
       'reply': 'جواب دیں',
       'submit': 'جمع کریں',
       'answer': 'جواب',
@@ -385,7 +442,8 @@ class AppTranslations {
       'enter_your_password': 'اپنا پاس ورڈ درج کریں',
       'invalid_username_or_password': 'غلط صارف نام یا پاس ورڈ',
       'login_error': 'لاگ ان میں خرابی',
-      'please_enter_username_and_password': 'براہ کرم صارف نام اور پاس ورڈ درج کریں',
+      'please_enter_username_and_password':
+          'براہ کرم صارف نام اور پاس ورڈ درج کریں',
       'register_new_masjid': 'نئی مسجد رجسٹر کریں',
       'masjid_name': 'مسجد کا نام',
       'location': 'مقام',
@@ -396,13 +454,16 @@ class AppTranslations {
       'password_must_be_at_least': 'پاس ورڈ کم از کم 6 حروف ہونا چاہیے',
       'registration_success': 'رجسٹریشن کامیاب!',
       'registration_failed': 'رجسٹریشن ناکام',
-      'create_admin_account': 'نماز کے اوقات کے انتظام کے لیے ایک ایڈمن اکاؤنٹ بنائیں',
+      'create_admin_account':
+          'نماز کے اوقات کے انتظام کے لیے ایک ایڈمن اکاؤنٹ بنائیں',
       'must_be_unique': 'منفرد ہونا چاہیے',
       'at_least_6': 'کم از کم 6 حروف',
 
       // Admin Panel
-      'no_masjid_selected_admin': 'کوئی مسجد منتخب نہیں۔ براہ کرم دوبارہ لاگ ان کریں۔',
-      'prayer_times_updated_successfully': 'نماز کے اوقات کامیابی سے اپ ڈیٹ ہو گئے!',
+      'no_masjid_selected_admin':
+          'کوئی مسجد منتخب نہیں۔ براہ کرم دوبارہ لاگ ان کریں۔',
+      'prayer_times_updated_successfully':
+          'نماز کے اوقات کامیابی سے اپ ڈیٹ ہو گئے!',
       'failed_to_save_prayer_times': 'نماز کے اوقات محفوظ کرنے میں ناکام',
       'error_saving_prayer_times': 'نماز کے اوقات محفوظ کرتے ہوئے خرابی',
       'qna_management': 'Q&A مینجمنٹ',
@@ -446,15 +507,15 @@ class AppTranslations {
       'please_enter_your_question': 'براہ کرم اپنا سوال درج کریں',
       'answer_question': 'سوال کا جواب دیں',
       'pending': 'زیرِ التوا',
-      'submit_question': 'سوال جمع کریں',
-      'ask_the_imam': 'امام سے پوچھیں',
+      'submit_question': 'پوسٹ کریں',
+      'ask_the_imam': 'اپنی کمیونٹی میں شیئر کریں',
       'your_name': 'آپ کا نام',
       'community_qa': 'کمیونٹی سوال و جواب',
       'change': 'تبدیل کریں',
       'enter_your_name': 'اپنا نام درج کریں',
       'posting_to': 'کو بھیجا جا رہا ہے:',
       'imam_will_review': 'امام نے آپ کے سوال کا جائزہ لے کر جواب دیں گے',
-      'write_your_question': 'اپنا سوال یہاں لکھیں...',
+      'write_your_question': 'حدیث، آیت یا سوال لکھیں…',
       'all_questions': 'تمام سوالات',
       'no_questions_yet': 'ابھی کوئی سوال نہیں',
       'question_from': 'سوال از',
@@ -488,14 +549,16 @@ class AppTranslations {
 
       // Masjid Selection
       'find_nearby_masjid': 'قریبی مسجد تلاش کریں',
-      'location_permission_required': 'قریبی مسجدیں تلاش کرنے کے لیے مقام کی اجازت درکار ہے',
+      'location_permission_required':
+          'قریبی مسجدیں تلاش کرنے کے لیے مقام کی اجازت درکار ہے',
       'unable_to_get_your_location': 'آپ کا مقام حاصل نہیں کیا جا سکا',
       'error_occurred_msg': 'ایک خرابی واقع ہوئی',
       'search_masjid_by_name': 'مسجد کو نام یا مقام کے لحاظ سے تلاش کریں...',
       'getting_your_location': 'آپ کا مقام حاصل کیا جا رہا ہے...',
       'retry_button': 'دوبارہ کوشش کریں',
       'no_masjids_found': 'کوئی مسجد نہیں ملی',
-      'try_adjusting_your_search': 'اپنی تلاش یا مقام کو تبدیل کرنے کی کوشش کریں',
+      'try_adjusting_your_search':
+          'اپنی تلاش یا مقام کو تبدیل کرنے کی کوشش کریں',
       'next_prayer_preview': 'اگلی نماز:',
       'select_this_masjid': 'یہ مسجد منتخب کریں',
       'unknown': 'نامعلوم',

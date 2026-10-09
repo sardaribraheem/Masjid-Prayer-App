@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/app_data.dart';
 
@@ -128,6 +129,7 @@ class MasjidRepository {
     try {
       final snapshot = await _firestore
           .collection('claimRequests')
+          .where('status', isEqualTo: 'pending')
           .orderBy('createdAt', descending: true)
           .get();
       return snapshot.docs
@@ -135,15 +137,90 @@ class MasjidRepository {
           .toList();
     } catch (e) {
       debugPrint('Error fetching claim requests: $e');
-      return [];
+      rethrow;
     }
   }
 
-  /// Approve a claim request
+  /// Atomically review a pending request and assign its applicant.
   Future<bool> approveClaim(String requestId) async {
     try {
-      await _firestore.collection('claimRequests').doc(requestId).update({
-        'status': 'approved',
+      final reviewer = FirebaseAuth.instance.currentUser;
+      if (reviewer == null) return false;
+      await _firestore.runTransaction((transaction) async {
+        final claimRef = _firestore.collection('claimRequests').doc(requestId);
+        final claim = await transaction.get(claimRef);
+        if (!claim.exists || claim.data()?['status'] != 'pending') {
+          throw StateError('This request has already been reviewed.');
+        }
+        final request = ClaimRequest.fromJson(claim.data()!, claim.id);
+        final userRef = _firestore.collection('users').doc(request.imamUid);
+        final user = await transaction.get(userRef);
+        if (!user.exists) {
+          throw StateError('Applicant account no longer exists.');
+        }
+        final masjidRef = _firestore
+            .collection('masjids')
+            .doc(request.masjidId ?? requestId);
+        final masjidDoc = await transaction.get(masjidRef);
+        final applicantData = user.data()!;
+        if (applicantData['deletionRequestedAt'] != null) {
+          throw StateError('Applicant account is being deleted.');
+        }
+        if (applicantData['role'] == 'imam' ||
+            applicantData['role'] == 'admin') {
+          if (applicantData['masjidId'] != masjidRef.id) {
+            throw StateError('Transfer the existing manager assignment first.');
+          }
+        }
+        String masjidName;
+        if (request.isNewMasjidRequest) {
+          if (masjidDoc.exists ||
+              request.masjidName == null ||
+              request.masjidLocation == null) {
+            throw StateError('New masjid request is invalid.');
+          }
+          masjidName = request.masjidName!;
+          transaction.set(
+            masjidRef,
+            Masjid(
+              name: masjidName,
+              location: request.masjidLocation!,
+              username: request.imamEmail,
+              creatorUid: request.imamUid,
+              authorizedImamUids: [request.imamUid],
+              isVerified: true,
+              latitude: request.latitude,
+              longitude: request.longitude,
+              prayerTimes: [
+                'Fajr',
+                'Dhuhr',
+                'Asr',
+                'Maghrib',
+                'Isha',
+              ].map((name) => PrayerTime(name: name, time: '')).toList(),
+            ).toJson(),
+          );
+        } else {
+          if (!masjidDoc.exists) throw StateError('Masjid no longer exists.');
+          masjidName = masjidDoc.data()!['name'] as String;
+          transaction.update(masjidRef, {
+            'authorizedImamUids': FieldValue.arrayUnion([request.imamUid]),
+            'isVerified': true,
+          });
+        }
+        transaction.update(userRef, {
+          'role': UserRole.imam.value,
+          'verificationStatus': VerificationStatus.approved.value,
+          'eventPermission': EventPermission.full.value,
+          'masjidId': masjidRef.id,
+          'masjidName': masjidName,
+        });
+        transaction.update(claimRef, {
+          'status': 'approved',
+          'approvedMasjidId': masjidRef.id,
+          'reviewedByUid': reviewer.uid,
+          'reviewedAt': FieldValue.serverTimestamp(),
+        });
       });
       return true;
     } catch (e) {
@@ -152,11 +229,14 @@ class MasjidRepository {
     }
   }
 
-  /// Reject a claim request
   Future<bool> rejectClaim(String requestId) async {
     try {
+      final reviewer = FirebaseAuth.instance.currentUser;
+      if (reviewer == null) return false;
       await _firestore.collection('claimRequests').doc(requestId).update({
         'status': 'rejected',
+        'reviewedByUid': reviewer.uid,
+        'reviewedAt': FieldValue.serverTimestamp(),
       });
       return true;
     } catch (e) {

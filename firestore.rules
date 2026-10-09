@@ -7,19 +7,39 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    /// Read the masjid document to get its stored admin email.
-    function getMasjidAdminEmail(masjidId) {
-      return get(/databases/$(database)/documents/masjids/$(masjidId)).data.username;
+    function getUserDoc(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
     }
 
-    /// A user is admin of a masjid if their Firebase Auth email matches the
-    /// masjid document's `username` field (which stores the admin email).
-    /// Also accepts the super-admin hardcoded email.
-    function isAdmin(masjidId) {
-      return isSignedIn() && (
-        request.auth.token.email == getMasjidAdminEmail(masjidId) ||
-        request.auth.token.email == 'superadmin@masjid-app.com'
-      );
+    // Only a trusted Admin SDK environment may issue this claim.
+    function isSuperAdmin() {
+      return isSignedIn() && request.auth.token.get('superAdmin', false) == true;
+    }
+
+    function isMasjidManager(masjidId) {
+      return isSignedIn() &&
+        getUserDoc(request.auth.uid).role in ['imam', 'admin'] &&
+        getUserDoc(request.auth.uid).masjidId == masjidId &&
+        request.auth.uid in get(/databases/$(database)/documents/masjids/$(masjidId)).data.get('authorizedImamUids', []);
+    }
+
+    // getAfter also permits registration's user + request batch.
+    function isActiveUser() {
+      return isSignedIn() &&
+        getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data
+          .get('deletionRequestedAt', null) == null;
+    }
+
+    function isDeletingUser() {
+      return isSignedIn() && getUserDoc(request.auth.uid)
+        .get('deletionRequestedAt', null) != null;
+    }
+
+    function parentAcceptsComments(masjidId, questionId) {
+      let parent = get(/databases/$(database)/documents/masjids/$(masjidId)/questions/$(questionId));
+      let author = parent.data.get('createdByUid', null);
+      return author == null || (exists(/databases/$(database)/documents/users/$(author)) &&
+        getUserDoc(author).get('deletionRequestedAt', null) == null);
     }
 
     // ============ MASJID DOCUMENTS ============
@@ -27,95 +47,205 @@ service cloud.firestore {
       // Anyone (signed in or not) can read masjid listings
       allow read: if true;
 
-      // Only the admin (email match) or super admin can update a masjid
-      allow update: if isAdmin(masjidId);
+      // Managers edit community details, never ownership or verification.
+      allow update: if isSuperAdmin() || (isMasjidManager(masjidId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name', 'nameUrdu', 'location', 'prayerTimes', 'jummah',
+          'lastUpdated', 'latitude', 'longitude', 'imamName', 'imamEmail', 'isJamia'
+        ]));
 
-      // Any signed-in user can create a masjid, but the `username` field
-      // (admin email) must match the creator's Firebase Auth email. This
-      // prevents impersonation while allowing self-registration.
-      allow create: if isSignedIn() &&
-        request.resource.data.username == request.auth.token.email;
-
-      // Only super admin can delete masjid documents
-      allow delete: if isSignedIn() &&
-        request.auth.token.email == 'superadmin@masjid-app.com';
+      // Applicants submit claimRequests; approval creates the masjid.
+      allow create, delete: if isSuperAdmin();
 
       // ============ SUB-COLLECTION: questions ============
       match /questions/{questionId} {
-        // Any signed-in user can read questions for their masjid
-        allow read: if isSignedIn();
+        // Community text is public; authorship remains visible in document data.
+        allow read: if true;
 
         // Any signed-in user can create a question (must set correct masjidId)
-        allow create: if isSignedIn() &&
-          request.resource.data.masjidId == masjidId;
+        allow create: if isActiveUser() &&
+          request.resource.data.masjidId == masjidId &&
+          request.resource.data.createdByUid == request.auth.uid &&
+          request.resource.data.questionText is string &&
+          request.resource.data.questionText.size() > 0 &&
+          request.resource.data.questionText.size() <= 4000 &&
+          request.resource.data.isAnswered == false &&
+          request.resource.data.answer == null &&
+          request.resource.data.keys().hasOnly(['id', 'userName', 'questionText',
+            'answer', 'masjidId', 'timestamp', 'isAnswered', 'isAnonymous', 'createdByUid']);
 
-        // Only admin/imam can answer (update answer/isAnswered fields)
-        allow update: if isAdmin(masjidId) &&
+        // Only the assigned imam/admin for the masjid can answer or moderate
+        // questions.
+        allow update: if (isMasjidManager(masjidId) || isSuperAdmin()) &&
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['answer', 'isAnswered']);
 
         // Only admin/imam can delete questions
-        allow delete: if isAdmin(masjidId);
+        allow delete: if isMasjidManager(masjidId) || isSuperAdmin() ||
+          (isSignedIn() && resource.data.createdByUid == request.auth.uid);
+        match /comments/{commentId} {
+          allow read: if true;
+          allow create: if isActiveUser() &&
+            exists(/databases/$(database)/documents/masjids/$(masjidId)/questions/$(questionId)) &&
+            parentAcceptsComments(masjidId, questionId) &&
+            request.resource.data.keys().hasOnly(['text', 'createdByUid', 'userName', 'timestamp']) &&
+            request.resource.data.createdByUid == request.auth.uid &&
+            request.resource.data.userName is string &&
+            request.resource.data.userName.size() <= 100 &&
+            request.resource.data.text is string &&
+            request.resource.data.text.size() > 0 &&
+            request.resource.data.text.size() <= 1000 &&
+            request.resource.data.timestamp == request.time;
+          allow delete: if isSuperAdmin() || isMasjidManager(masjidId) ||
+            (isSignedIn() && (resource.data.createdByUid == request.auth.uid ||
+              get(/databases/$(database)/documents/masjids/$(masjidId)/questions/$(questionId)).data.createdByUid == request.auth.uid));
+        }
       }
 
       // ============ SUB-COLLECTION: events ============
       match /events/{eventId} {
-        // Any signed-in user can read events
-        allow read: if isSignedIn();
+        // Only approved events are public; requests stay private to their
+        // author and assigned managers. Queries must reflect this policy.
+        allow read: if resource.data.status == 'approved' || isSuperAdmin() ||
+          isMasjidManager(masjidId) ||
+          (isSignedIn() && resource.data.createdByUid == request.auth.uid);
 
-        // Only admin can create events
-        allow create: if isAdmin(masjidId) &&
-          request.resource.data.masjidId == masjidId;
+        allow create: if isActiveUser() &&
+          request.resource.data.masjidId == masjidId &&
+          request.resource.data.createdByUid == request.auth.uid &&
+          request.resource.data.title is string && request.resource.data.title.size() > 0 &&
+          request.resource.data.title.size() <= 200 &&
+          request.resource.data.description is string && request.resource.data.description.size() <= 4000 &&
+          ((isMasjidManager(masjidId) || isSuperAdmin()) &&
+            request.resource.data.status in ['pending', 'approved'] ||
+           (getUserDoc(request.auth.uid).role == 'verified_muqtaddi' &&
+            getUserDoc(request.auth.uid).verificationStatus == 'approved' &&
+            getUserDoc(request.auth.uid).masjidId == masjidId &&
+            getUserDoc(request.auth.uid).eventPermission in ['approval_required', 'full'] &&
+            (request.resource.data.status == 'pending' ||
+              (getUserDoc(request.auth.uid).eventPermission == 'full' &&
+               request.resource.data.status == 'approved'))));
 
-        // Only admin can update events
-        allow update: if isAdmin(masjidId);
+        allow update: if (isMasjidManager(masjidId) || isSuperAdmin()) &&
+          request.resource.data.masjidId == resource.data.masjidId &&
+          request.resource.data.createdByUid == resource.data.get('createdByUid', null) &&
+          request.resource.data.status in ['pending', 'approved', 'rejected'];
+        allow delete: if isMasjidManager(masjidId) || isSuperAdmin() ||
+          (isSignedIn() && resource.data.createdByUid == request.auth.uid &&
+            (isDeletingUser() || resource.data.status == 'pending'));
 
-        // Only admin can delete events
-        allow delete: if isAdmin(masjidId);
       }
     }
 
-    // ============ USER DOCUMENTS (Muqtaddi accounts, `latesttodo.md` §2) ============
-    // Roles live in `users/{uid}`. A signed-in user can read and manage their
-    // OWN document, but can never self-assign elevated roles: registration
-    // creates a plain `muqtaddi`, and `role` / `verificationStatus` /
-    // `eventPermission` can only be changed by an admin/imam — which the
-    // full §9 rule rewrite models. Until that lands, self-update is limited
-    // to profile/association fields and role fields are immutable.
+    // Role and management grants are assigned only through trusted approval.
     match /users/{userId} {
-      // A user reads their own document (hydrates role on login).
-      allow read: if isSignedIn() && request.auth.uid == userId;
-
-      // Registration: create your own doc, always starting as a plain
-      // `muqtaddi` with no verification and no event permission.
-      allow create: if isSignedIn() &&
-        request.auth.uid == userId &&
+      allow read: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin() || isMasjidManager(resource.data.masjidId));
+      allow create: if isSignedIn() && request.auth.uid == userId &&
+        request.resource.data.keys().hasOnly(['username', 'email', 'role',
+          'verificationStatus', 'eventPermission', 'masjidId', 'masjidName',
+          'createdAt', 'lastLogin']) &&
+        request.resource.data.username is string &&
+        request.resource.data.username.size() > 0 &&
+        request.resource.data.username.size() <= 100 &&
+        request.resource.data.email == request.auth.token.email &&
         request.resource.data.role == 'muqtaddi' &&
         request.resource.data.verificationStatus == 'none' &&
         request.resource.data.eventPermission == 'none';
 
-      // Self-edit of profile/association fields only; role, verification
-      // and event permission must stay identical to the stored document.
-      allow update: if isSignedIn() &&
-        request.auth.uid == userId &&
-        request.resource.data.role == resource.data.role &&
-        request.resource.data.verificationStatus ==
-          resource.data.verificationStatus &&
-        request.resource.data.eventPermission ==
-          resource.data.eventPermission &&
+      // A member may apply, but never approve or elevate their own role.
+      allow update: if isActiveUser() && request.auth.uid == userId &&
+        resource.data.role == 'muqtaddi' &&
+        resource.data.verificationStatus in ['none', 'rejected'] &&
+        resource.data.eventPermission == 'none' &&
+        request.resource.data.role == 'muqtaddi' &&
+        request.resource.data.verificationStatus == 'pending' &&
+        request.resource.data.eventPermission == 'none' &&
+        request.resource.data.masjidId is string &&
+        exists(/databases/$(database)/documents/masjids/$(request.resource.data.masjidId)) &&
         request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['username', 'email', 'masjidId', 'masjidName', 'lastLogin']);
+          .hasOnly(['verificationStatus', 'masjidId', 'masjidName']);
+
+      // Assigned managers review only normal members of their own masjid.
+      allow update: if isActiveUser() && isMasjidManager(resource.data.masjidId) &&
+        resource.data.role in ['muqtaddi', 'verified_muqtaddi'] &&
+        resource.data.get('deletionRequestedAt', null) == null &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['role', 'verificationStatus', 'eventPermission']) &&
+        ((request.resource.data.role == 'verified_muqtaddi' &&
+          request.resource.data.verificationStatus == 'approved' &&
+          request.resource.data.eventPermission in ['approval_required', 'full']) ||
+         (request.resource.data.role == 'muqtaddi' &&
+          request.resource.data.verificationStatus == 'rejected' &&
+          request.resource.data.eventPermission == 'none'));
+
+      allow update: if (isSignedIn() && request.auth.uid == userId &&
+        resource.data.role in ['muqtaddi', 'verified_muqtaddi'] &&
+        !isSuperAdmin() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletionRequestedAt']) &&
+        resource.data.get('deletionRequestedAt', null) == null &&
+        request.resource.data.deletionRequestedAt == request.time &&
+        request.auth.token.auth_time > request.time.toMillis() / 1000 - 300) ||
+        isSuperAdmin() || (isActiveUser() && request.auth.uid == userId &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.verificationStatus == resource.data.verificationStatus &&
+        request.resource.data.eventPermission == resource.data.eventPermission &&
+        request.resource.data.username is string &&
+        request.resource.data.username.size() > 0 &&
+        request.resource.data.username.size() <= 100 &&
+        request.resource.data.email == request.auth.token.email &&
+        (request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['username', 'email', 'lastLogin']) ||
+          (resource.data.role == 'muqtaddi' &&
+            resource.data.verificationStatus in ['none', 'rejected'] &&
+            resource.data.eventPermission == 'none' &&
+            request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['username', 'email', 'lastLogin', 'masjidId', 'masjidName']))));
+      allow delete: if isDeletingUser() && request.auth.uid == userId &&
+        resource.data.role in ['muqtaddi', 'verified_muqtaddi'] && !isSuperAdmin();
     }
 
-    // ============ CLAIM REQUESTS (Super Admin Only) ============
+    match /{path=**}/questions/{postId} {
+      allow list: if isSignedIn() && resource.data.createdByUid == request.auth.uid;
+    }
+    match /{path=**}/comments/{commentId} {
+      allow list: if isSignedIn() && resource.data.createdByUid == request.auth.uid;
+    }
+    match /{path=**}/events/{eventId} {
+      allow list: if isSignedIn() && resource.data.createdByUid == request.auth.uid;
+    }
+
     match /claimRequests/{claimId} {
-      allow read: if isSignedIn() &&
-        request.auth.token.email == 'superadmin@masjid-app.com';
-
-      allow create: if isSignedIn();
-
-      allow update, delete: if isSignedIn() &&
-        request.auth.token.email == 'superadmin@masjid-app.com';
+      allow read: if isSuperAdmin() ||
+        (isSignedIn() && resource.data.imamUid == request.auth.uid);
+      allow create: if isActiveUser() &&
+        request.resource.data.keys().hasOnly(['masjidId', 'imamUid', 'imamName',
+          'imamEmail', 'status', 'createdAt', 'type', 'masjidName',
+          'masjidLocation', 'latitude', 'longitude']) &&
+        request.resource.data.imamUid == request.auth.uid &&
+        request.resource.data.imamEmail == request.auth.token.email &&
+        request.resource.data.imamName is string &&
+        request.resource.data.imamName.size() > 0 &&
+        request.resource.data.imamName.size() <= 100 &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.createdAt == request.time &&
+        ((request.resource.data.masjidId is string &&
+          exists(/databases/$(database)/documents/masjids/$(request.resource.data.masjidId))) ||
+         (request.resource.data.masjidId == null &&
+          request.resource.data.type == 'new_masjid' &&
+          request.resource.data.masjidName is string &&
+          request.resource.data.masjidName.size() > 0 &&
+          request.resource.data.masjidName.size() <= 200 &&
+          request.resource.data.masjidLocation is string &&
+          request.resource.data.masjidLocation.size() > 0 &&
+          request.resource.data.masjidLocation.size() <= 500));
+      allow update: if isSuperAdmin() && resource.data.status == 'pending' &&
+        request.resource.data.status in ['approved', 'rejected'] &&
+        request.resource.data.reviewedByUid == request.auth.uid &&
+        request.resource.data.reviewedAt == request.time &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'approvedMasjidId', 'reviewedByUid', 'reviewedAt']);
+      allow delete: if isSuperAdmin() ||
+        (isSignedIn() && resource.data.imamUid == request.auth.uid);
     }
 
     // Deny all other collections by default

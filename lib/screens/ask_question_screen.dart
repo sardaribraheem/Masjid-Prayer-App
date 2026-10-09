@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/app_data.dart';
+import '../providers/auth_provider.dart';
 import '../providers/question_provider.dart';
 import '../l10n/app_localization.dart';
 import '../l10n/app_strings.dart';
@@ -8,31 +9,32 @@ import '../theme/app_theme.dart';
 
 /// Screen where users can post questions to the imam
 class AskQuestionScreen extends StatefulWidget {
-  const AskQuestionScreen({Key? key}) : super(key: key);
+  const AskQuestionScreen({super.key});
 
   @override
   State<AskQuestionScreen> createState() => _AskQuestionScreenState();
 }
 
 class _AskQuestionScreenState extends State<AskQuestionScreen> {
-  final TextEditingController _nameController = TextEditingController();
   final TextEditingController _questionController = TextEditingController();
   bool _isSubmitting = false;
+  bool _isAnonymous = false;
 
   @override
   void dispose() {
-    _nameController.dispose();
     _questionController.dispose();
     super.dispose();
   }
 
   /// Validate and submit the question
   Future<void> _submitQuestion() async {
-    // Validation
-    if (_nameController.text.trim().isEmpty) {
+    final authProvider = context.read<AuthProvider>();
+    if (!authProvider.isLoggedIn) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(appLocalization.t(AppStrings.pleaseEnterYourName)),
+          content: Text(
+            appLocalization.t(AppStrings.guestCanReadLoginToParticipate),
+          ),
         ),
       );
       return;
@@ -57,20 +59,20 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
       return;
     }
 
-    // Submit the question
     setState(() => _isSubmitting = true);
 
     try {
       final success = await context.read<QuestionProvider>().addQuestion(
-            userName: _nameController.text.trim(),
-            questionText: _questionController.text.trim(),
-            masjidId: masjidId,
-          );
+        userName: authProvider.currentUser?.username ?? 'Muqtaddi',
+        questionText: _questionController.text.trim(),
+        masjidId: masjidId,
+        createdByUid: authProvider.currentUser?.id,
+        isAnonymous: _isAnonymous,
+      );
 
       if (!mounted) return;
 
       if (success) {
-        // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(appLocalization.t(AppStrings.questionSubmitted)),
@@ -78,11 +80,11 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
           ),
         );
 
-        // Clear the form
-        _nameController.clear();
         _questionController.clear();
+        setState(() {
+          _isAnonymous = false;
+        });
 
-        // Go back
         Future.delayed(const Duration(seconds: 1), () {
           if (mounted) Navigator.pop(context);
         });
@@ -158,7 +160,10 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
                     children: [
                       Text(
                         appLocalization.t(AppStrings.postingTo),
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -174,33 +179,18 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
                 ),
               const SizedBox(height: 25),
 
-              // Name Field
-              Text(
-                appLocalization.t(AppStrings.yourName),
-                style: Theme.of(context).textTheme.labelLarge,
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _nameController,
-                enabled: !_isSubmitting,
-                decoration: InputDecoration(
-                  hintText: appLocalization.t(AppStrings.enterYourName),
-                  prefixIcon: Icon(Icons.person, color: ColorPalette.primary),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: ColorPalette.lightBorder),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(
-                      color: ColorPalette.primary,
-                      width: 2,
-                    ),
-                  ),
-                ),
+              // Anonymous / identity option
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                title: const Text('Post anonymously'),
+                value: _isAnonymous,
+                onChanged: _isSubmitting
+                    ? null
+                    : (value) {
+                        if (value == null) return;
+                        setState(() => _isAnonymous = value);
+                      },
               ),
               const SizedBox(height: 20),
 
@@ -214,6 +204,7 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
                 controller: _questionController,
                 enabled: !_isSubmitting,
                 maxLines: 6,
+                maxLength: 4000,
                 decoration: InputDecoration(
                   hintText: appLocalization.t(AppStrings.writeYourQuestion),
                   prefixIcon: const Padding(
@@ -239,6 +230,7 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 16),
               const SizedBox(height: 30),
 
               // Submit Button

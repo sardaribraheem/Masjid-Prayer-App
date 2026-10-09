@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/app_data.dart';
 import '../providers/event_provider.dart';
+import '../providers/auth_provider.dart';
 import '../widgets/shared/empty_state.dart';
 import '../l10n/app_localization.dart';
 import '../l10n/app_strings.dart';
@@ -16,6 +17,8 @@ class AdminEventsScreen extends StatefulWidget {
 }
 
 class _AdminEventsScreenState extends State<AdminEventsScreen> {
+  String _filter = 'all';
+
   @override
   void initState() {
     super.initState();
@@ -29,12 +32,25 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
   Future<void> _loadEvents() async {
     final masjidId = AppData.selectedMasjid?.id ?? '';
     if (masjidId.isNotEmpty) {
-      await context.read<EventProvider>().loadEvents(masjidId);
+      await context.read<EventProvider>().loadEvents(
+        masjidId,
+        includePending: true,
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    if (!authProvider.isSuperAdmin &&
+        authProvider.currentUser?.canManageMasjid(AppData.selectedMasjid?.id) !=
+            true) {
+      return Scaffold(
+        body: Center(
+          child: Text(appLocalization.t('manager_approval_required')),
+        ),
+      );
+    }
     final masjidId = AppData.selectedMasjid?.id ?? '';
 
     return Scaffold(
@@ -55,44 +71,134 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
       body: masjidId.isEmpty
           ? Center(child: Text(appLocalization.t(AppStrings.noMasjidSelected2)))
           : context.watch<EventProvider>().isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _buildEventsList(context, masjidId),
+          ? const Center(child: CircularProgressIndicator())
+          : _buildEventsList(context, masjidId),
     );
   }
 
   Widget _buildEventsList(BuildContext context, String masjidId) {
-    final events =
-        context.watch<EventProvider>().getEventsByMasjid(masjidId);
+    final provider = context.watch<EventProvider>();
+    final allEvents = provider.getEventsByMasjid(masjidId);
+    final events = switch (_filter) {
+      'pending' => provider.getPendingEventsByMasjid(masjidId),
+      'approved' => provider.getApprovedEventsByMasjid(masjidId),
+      _ => allEvents,
+    };
 
     if (events.isEmpty) {
-      return EmptyState(
-        icon: Icons.event_outlined,
-        title: appLocalization.t(AppStrings.noEvents),
-        subtitle: appLocalization.t(AppStrings.eventsWillAppearHere),
-        actionLabel: appLocalization.t(AppStrings.createEvent),
-        onAction: () => _showEventDialog(context),
+      return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Row(
+              children: [
+                _FilterChip(
+                  label: 'All',
+                  selected: _filter == 'all',
+                  onTap: () => setState(() => _filter = 'all'),
+                ),
+                const SizedBox(width: 8),
+                _FilterChip(
+                  label: 'Pending',
+                  selected: _filter == 'pending',
+                  onTap: () => setState(() => _filter = 'pending'),
+                ),
+                const SizedBox(width: 8),
+                _FilterChip(
+                  label: 'Approved',
+                  selected: _filter == 'approved',
+                  onTap: () => setState(() => _filter = 'approved'),
+                ),
+              ],
+            ),
+          ),
+          const Expanded(
+            child: EmptyState(
+              icon: Icons.event_outlined,
+              title: 'No events',
+              subtitle: 'Events will appear here',
+              actionLabel: 'Create event',
+              onAction: null,
+            ),
+          ),
+        ],
       );
     }
 
     return RefreshIndicator(
       onRefresh: _loadEvents,
-      child: ListView.builder(
+      child: ListView(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
-        itemCount: events.length,
-        itemBuilder: (context, index) {
-          final event = events[index];
-          return _EventCard(
-            event: event,
-            onEditTap: () => _showEventDialog(context, existing: event),
-            onDeleteTap: () => _confirmDelete(context, event),
-          );
-        },
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                _FilterChip(
+                  label: 'All',
+                  selected: _filter == 'all',
+                  onTap: () => setState(() => _filter = 'all'),
+                ),
+                const SizedBox(width: 8),
+                _FilterChip(
+                  label: 'Pending',
+                  selected: _filter == 'pending',
+                  onTap: () => setState(() => _filter = 'pending'),
+                ),
+                const SizedBox(width: 8),
+                _FilterChip(
+                  label: 'Approved',
+                  selected: _filter == 'approved',
+                  onTap: () => setState(() => _filter = 'approved'),
+                ),
+              ],
+            ),
+          ),
+          ...events.map(
+            (event) => _EventCard(
+              event: event,
+              onEditTap: () => _showEventDialog(context, existing: event),
+              onDeleteTap: () => _confirmDelete(context, event),
+              onApproveTap: () =>
+                  _updateEventStatus(context, event, EventStatus.approved),
+              onRejectTap: () =>
+                  _updateEventStatus(context, event, EventStatus.rejected),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updateEventStatus(
+    BuildContext context,
+    Event event,
+    EventStatus status,
+  ) async {
+    final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
+    final success = await context.read<EventProvider>().updateEventStatus(
+      AppData.selectedMasjid?.id ?? '',
+      event.id,
+      status,
+    );
+
+    if (!mounted || scaffoldMessenger == null) return;
+    scaffoldMessenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          success ? 'Event status updated' : 'Could not update event status',
+        ),
+        backgroundColor: success ? ColorPalette.success : ColorPalette.error,
       ),
     );
   }
 
   /// Confirm delete with a dialog
   Future<void> _confirmDelete(BuildContext context, Event event) async {
+    final eventProvider = context.read<EventProvider>();
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final masjidId = AppData.selectedMasjid?.id ?? '';
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -116,35 +222,34 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
 
     if (confirmed != true || !mounted) return;
 
-    final masjidId = AppData.selectedMasjid?.id ?? '';
-    final success =
-        await context.read<EventProvider>().deleteEvent(masjidId, event.id);
+    final success = await eventProvider.deleteEvent(masjidId, event.id);
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    scaffoldMessenger.showSnackBar(
       SnackBar(
         content: Text(
           success
               ? appLocalization.t(AppStrings.eventDeleted)
               : appLocalization.t(AppStrings.errorOccurredMsg),
         ),
-        backgroundColor:
-            success ? ColorPalette.success : ColorPalette.error,
+        backgroundColor: success ? ColorPalette.success : ColorPalette.error,
       ),
     );
   }
 
   /// Show dialog to add or edit an event
   Future<void> _showEventDialog(BuildContext context, {Event? existing}) async {
+    final prov = Provider.of<EventProvider>(context, listen: false);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final masjidId = AppData.selectedMasjid?.id ?? '';
+    final masjidName = AppData.selectedMasjid?.name ?? '';
+
     final result = await showDialog<Event>(
       context: context,
       builder: (_) => _EventFormDialog(existing: existing),
     );
 
-    if (result == null || !mounted) return;
-
-    final masjidId = AppData.selectedMasjid?.id ?? '';
-    final masjidName = AppData.selectedMasjid?.name ?? '';
+    if (result == null || !mounted || !context.mounted) return;
 
     final eventToSave = Event(
       id: existing?.id ?? '',
@@ -157,23 +262,30 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
       endTime: result.endTime,
       location: result.location,
       category: result.category,
+      mediaUrl: result.mediaUrl,
+      mediaType: result.mediaType,
+      status: existing?.status ?? EventStatus.approved,
+      createdByUid: existing != null
+          ? existing.createdByUid
+          : context.read<AuthProvider>().currentUser?.id,
+      createdByName: existing != null
+          ? existing.createdByName
+          : context.read<AuthProvider>().currentUser?.username,
     );
 
-    final provider = context.read<EventProvider>();
     final success = existing == null
-        ? await provider.addEvent(eventToSave)
-        : await provider.updateEvent(masjidId, eventToSave);
+        ? await prov.addEvent(eventToSave)
+        : await prov.updateEvent(masjidId, eventToSave);
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    scaffoldMessenger.showSnackBar(
       SnackBar(
         content: Text(
           success
               ? appLocalization.t(AppStrings.changesSaved)
               : appLocalization.t(AppStrings.errorOccurredMsg),
         ),
-        backgroundColor:
-            success ? ColorPalette.success : ColorPalette.error,
+        backgroundColor: success ? ColorPalette.success : ColorPalette.error,
       ),
     );
   }
@@ -184,11 +296,15 @@ class _EventCard extends StatelessWidget {
   final Event event;
   final VoidCallback onEditTap;
   final VoidCallback onDeleteTap;
+  final VoidCallback? onApproveTap;
+  final VoidCallback? onRejectTap;
 
   const _EventCard({
     required this.event,
     required this.onEditTap,
     required this.onDeleteTap,
+    this.onApproveTap,
+    this.onRejectTap,
   });
 
   @override
@@ -237,16 +353,14 @@ class _EventCard extends StatelessWidget {
             const SizedBox(height: 8),
             Row(
               children: [
-                const Icon(Icons.calendar_today,
-                    size: 14, color: Colors.grey),
+                const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
                 const SizedBox(width: 6),
                 Text(
                   _formatDate(event.eventDate),
                   style: const TextStyle(fontSize: 13, color: Colors.grey),
                 ),
                 const SizedBox(width: 12),
-                const Icon(Icons.access_time,
-                    size: 14, color: Colors.grey),
+                const Icon(Icons.access_time, size: 14, color: Colors.grey),
                 const SizedBox(width: 6),
                 Text(
                   '${event.startTime} - ${event.endTime}',
@@ -258,14 +372,12 @@ class _EventCard extends StatelessWidget {
               const SizedBox(height: 6),
               Row(
                 children: [
-                  const Icon(Icons.location_on,
-                      size: 14, color: Colors.grey),
+                  const Icon(Icons.location_on, size: 14, color: Colors.grey),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       event.location!,
-                      style:
-                          const TextStyle(fontSize: 13, color: Colors.grey),
+                      style: const TextStyle(fontSize: 13, color: Colors.grey),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -280,6 +392,35 @@ class _EventCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 12),
+            if (event.status == EventStatus.pending) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: onApproveTap,
+                      icon: const Icon(Icons.check, size: 18),
+                      label: const Text('Approve'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ColorPalette.success,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onRejectTap,
+                      icon: const Icon(Icons.close, size: 18),
+                      label: const Text('Reject'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: ColorPalette.error,
+                        side: BorderSide(color: ColorPalette.error),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
             Row(
               children: [
                 Expanded(
@@ -315,10 +456,63 @@ class _EventCard extends StatelessWidget {
 
   String _formatDate(DateTime date) {
     final months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected
+              ? ColorPalette.primary
+              : Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected
+                ? ColorPalette.primary
+                : Theme.of(context).colorScheme.outline,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected
+                ? Theme.of(context).colorScheme.onPrimary
+                : Theme.of(context).colorScheme.onSurface,
+            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+            fontSize: 12,
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -337,9 +531,11 @@ class _EventFormDialogState extends State<_EventFormDialog> {
   late final TextEditingController _descriptionController;
   late final TextEditingController _locationController;
   late final TextEditingController _categoryController;
+  late final TextEditingController _mediaUrlController;
   late DateTime _eventDate;
   late TimeOfDay _startTime;
   late TimeOfDay _endTime;
+  String _mediaType = 'image';
   final _formKey = GlobalKey<FormState>();
 
   static const _categories = ['Class', 'Talk', 'Gathering', 'Lecture'];
@@ -349,17 +545,20 @@ class _EventFormDialogState extends State<_EventFormDialog> {
     super.initState();
     final existing = widget.existing;
     _titleController = TextEditingController(text: existing?.title ?? '');
-    _descriptionController =
-        TextEditingController(text: existing?.description ?? '');
-    _locationController =
-        TextEditingController(text: existing?.location ?? '');
-    _categoryController =
-        TextEditingController(text: existing?.category ?? '');
+    _descriptionController = TextEditingController(
+      text: existing?.description ?? '',
+    );
+    _locationController = TextEditingController(text: existing?.location ?? '');
+    _categoryController = TextEditingController(text: existing?.category ?? '');
+    _mediaUrlController = TextEditingController(text: existing?.mediaUrl ?? '');
+    _mediaType =
+        existing?.mediaType ??
+        (existing?.isImageMedia == true ? 'image' : 'video');
     _eventDate = existing?.eventDate ?? DateTime.now();
-    _startTime = _parseTime(existing?.startTime) ??
-        const TimeOfDay(hour: 10, minute: 0);
-    _endTime = _parseTime(existing?.endTime) ??
-        const TimeOfDay(hour: 12, minute: 0);
+    _startTime =
+        _parseTime(existing?.startTime) ?? const TimeOfDay(hour: 10, minute: 0);
+    _endTime =
+        _parseTime(existing?.endTime) ?? const TimeOfDay(hour: 12, minute: 0);
   }
 
   TimeOfDay? _parseTime(String? timeStr) {
@@ -371,8 +570,7 @@ class _EventFormDialogState extends State<_EventFormDialog> {
       int hour = int.parse(parts[0]);
       final rest = parts[1].split(' ');
       final minute = int.parse(rest[0]);
-      final period =
-          rest.length > 1 ? rest[1].toUpperCase() : 'AM';
+      final period = rest.length > 1 ? rest[1].toUpperCase() : 'AM';
       if (period == 'PM' && hour != 12) hour += 12;
       if (period == 'AM' && hour == 12) hour = 0;
       return TimeOfDay(hour: hour, minute: minute);
@@ -393,6 +591,7 @@ class _EventFormDialogState extends State<_EventFormDialog> {
     _descriptionController.dispose();
     _locationController.dispose();
     _categoryController.dispose();
+    _mediaUrlController.dispose();
     super.dispose();
   }
 
@@ -427,6 +626,7 @@ class _EventFormDialogState extends State<_EventFormDialog> {
   void _save() {
     if (!_formKey.currentState!.validate()) return;
 
+    final mediaUrl = _mediaUrlController.text.trim();
     final result = Event(
       id: widget.existing?.id ?? '',
       title: _titleController.text.trim(),
@@ -442,6 +642,8 @@ class _EventFormDialogState extends State<_EventFormDialog> {
       category: _categoryController.text.trim().isEmpty
           ? null
           : _categoryController.text.trim(),
+      mediaUrl: mediaUrl.isEmpty ? null : mediaUrl,
+      mediaType: mediaUrl.isEmpty ? null : _mediaType,
     );
     Navigator.pop(context, result);
   }
@@ -484,6 +686,34 @@ class _EventFormDialogState extends State<_EventFormDialog> {
                   ),
                   validator: (v) =>
                       v == null || v.trim().isEmpty ? 'Required' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _mediaUrlController,
+                  decoration: InputDecoration(
+                    labelText: 'Optional media link',
+                    border: const OutlineInputBorder(),
+                    hintText: 'https://example.com/poster.jpg',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Text('Media type: '),
+                    const SizedBox(width: 8),
+                    DropdownButton<String>(
+                      value: _mediaType,
+                      items: const [
+                        DropdownMenuItem(value: 'image', child: Text('Image')),
+                        DropdownMenuItem(value: 'video', child: Text('Video')),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => _mediaType = value);
+                        }
+                      },
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 12),
                 // Date picker
@@ -551,10 +781,7 @@ class _EventFormDialogState extends State<_EventFormDialog> {
                     border: const OutlineInputBorder(),
                   ),
                   items: _categories
-                      .map((c) => DropdownMenuItem(
-                            value: c,
-                            child: Text(c),
-                          ))
+                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                       .toList(),
                   onChanged: (value) {
                     _categoryController.text = value ?? '';
@@ -581,3 +808,9 @@ class _EventFormDialogState extends State<_EventFormDialog> {
     );
   }
 }
+
+/// Shared form used by the verified member's proposal action.
+Future<Event?> showEventProposalForm(BuildContext context) => showDialog<Event>(
+  context: context,
+  builder: (_) => const _EventFormDialog(),
+);

@@ -7,7 +7,7 @@ import '../theme/app_theme.dart';
 class EnhancedEventCard extends StatelessWidget {
   final Event event;
 
-  const EnhancedEventCard({Key? key, required this.event}) : super(key: key);
+  const EnhancedEventCard({super.key, required this.event});
 
   String _formatDate(DateTime date) {
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -57,6 +57,31 @@ class EnhancedEventCard extends StatelessWidget {
       default:
         return ColorPalette.primary;
     }
+  }
+
+  Widget _buildMediaFallback(BuildContext context, Event event) {
+    return Container(
+      alignment: Alignment.center,
+      color: ColorPalette.primary.withValues(alpha: 0.08),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            event.isVideoMedia ? Icons.videocam : Icons.image,
+            size: 38,
+            color: ColorPalette.primary,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            event.isVideoMedia ? 'Video attachment' : 'Image attachment',
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -167,6 +192,25 @@ class EnhancedEventCard extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
+              if (event.hasMedia) ...[
+                const SizedBox(height: 12),
+                Container(
+                  height: 180,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: ColorPalette.primary.withValues(alpha: 0.08),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: event.isImageMedia
+                      ? Image.network(
+                          event.mediaUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _buildMediaFallback(context, event),
+                        )
+                      : _buildMediaFallback(context, event),
+                ),
+              ],
               const SizedBox(height: 12),
 
               // Date and Time Info Row

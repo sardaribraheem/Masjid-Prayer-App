@@ -115,21 +115,24 @@ class MasjidClaimProvider extends ChangeNotifier {
 
   /// Approve a claim request (super admin)
   Future<bool> approveRequest(String requestId) async {
+    if (_isLoading) return false;
+    _isLoading = true;
+    notifyListeners();
     final success = await _repository.approveClaim(requestId);
-    if (success) {
-      _pendingRequests.removeWhere((r) => r.id == requestId);
-      notifyListeners();
-    }
+    if (success) _pendingRequests.removeWhere((r) => r.id == requestId);
+    _isLoading = false;
+    notifyListeners();
     return success;
   }
 
-  /// Reject a claim request (super admin)
   Future<bool> rejectRequest(String requestId) async {
+    if (_isLoading) return false;
+    _isLoading = true;
+    notifyListeners();
     final success = await _repository.rejectClaim(requestId);
-    if (success) {
-      _pendingRequests.removeWhere((r) => r.id == requestId);
-      notifyListeners();
-    }
+    if (success) _pendingRequests.removeWhere((r) => r.id == requestId);
+    _isLoading = false;
+    notifyListeners();
     return success;
   }
 

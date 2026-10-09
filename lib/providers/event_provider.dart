@@ -23,13 +23,33 @@ class EventProvider extends ChangeNotifier {
     return _events.where((e) => e.masjidId == masjidId).toList();
   }
 
+  /// Public feed should only show approved events.
+  List<Event> getApprovedEventsByMasjid(String masjidId) {
+    return _events
+        .where((e) => e.masjidId == masjidId && e.isApproved)
+        .toList();
+  }
+
+  /// Admin review queue for pending approvals.
+  List<Event> getPendingEventsByMasjid(String masjidId) {
+    return _events
+        .where((e) => e.masjidId == masjidId && e.status == EventStatus.pending)
+        .toList();
+  }
+
   /// Load events from Firestore for a specific masjid
-  Future<void> loadEvents(String masjidId) async {
+  Future<void> loadEvents(
+    String masjidId, {
+    bool includePending = false,
+  }) async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      _events = await _repository.getEvents(masjidId);
+      _events = await _repository.getEvents(
+        masjidId,
+        includePending: includePending,
+      );
       _error = null;
     } catch (e) {
       _error = e.toString();
@@ -44,11 +64,19 @@ class EventProvider extends ChangeNotifier {
   /// caller can cancel it in dispose().
   StreamSubscription<List<Event>> subscribeToEvents(String masjidId) {
     _streamSub?.cancel();
-    final sub = _repository.getEventsStream(masjidId).listen((events) {
-      _events = events;
-      _error = null;
-      notifyListeners();
-    });
+    final sub = _repository
+        .getEventsStream(masjidId)
+        .listen(
+          (events) {
+            _events = events;
+            _error = null;
+            notifyListeners();
+          },
+          onError: (Object error) {
+            _error = error.toString();
+            notifyListeners();
+          },
+        );
     _streamSub = sub;
     return sub;
   }
@@ -74,6 +102,26 @@ class EventProvider extends ChangeNotifier {
   Future<bool> updateEvent(String masjidId, Event event) async {
     final success = await _repository.updateEvent(masjidId, event);
     if (success) {
+      notifyListeners();
+    }
+    return success;
+  }
+
+  /// Change an event’s moderation state.
+  Future<bool> updateEventStatus(
+    String masjidId,
+    String eventId,
+    EventStatus status,
+  ) async {
+    final index = _events.indexWhere((e) => e.id == eventId);
+    if (index == -1) {
+      return false;
+    }
+
+    final updated = _events[index].copyWith(status: status);
+    final success = await _repository.updateEvent(masjidId, updated);
+    if (success) {
+      _events[index] = updated;
       notifyListeners();
     }
     return success;

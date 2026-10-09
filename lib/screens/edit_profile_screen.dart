@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../l10n/app_localization.dart';
 import '../l10n/app_strings.dart';
@@ -56,6 +57,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // 1. Update display name if it changed.
       final newName = _displayNameController.text.trim();
       if (newName.isNotEmpty && newName != user.displayName) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({'username': newName});
         await user.updateDisplayName(newName);
       }
 
@@ -87,9 +92,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _showError(_mapFirebaseError(e));
     } catch (e) {
       if (!mounted) return;
-      _showError(
-        '${appLocalization.t(AppStrings.error)}: ${e.toString()}',
-      );
+      _showError('${appLocalization.t(AppStrings.error)}: ${e.toString()}');
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -99,10 +102,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: ColorPalette.error,
-      ),
+      SnackBar(content: Text(message), backgroundColor: ColorPalette.error),
     );
   }
 
@@ -206,6 +206,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               const SizedBox(height: 8),
               TextFormField(
                 controller: _displayNameController,
+                maxLength: 100,
                 textInputAction: TextInputAction.next,
                 decoration: InputDecoration(
                   hintText: appLocalization.t(AppStrings.enterYourName),
@@ -227,7 +228,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 appLocalization.t(AppStrings.passwordOptional),
                 style: TextStyle(
                   fontSize: 12,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ),
               const SizedBox(height: 12),
@@ -237,13 +240,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 textInputAction: TextInputAction.next,
                 decoration: InputDecoration(
                   labelText: appLocalization.t(AppStrings.oldPassword),
-                  prefixIcon: Icon(Icons.lock_outline,
-                      color: ColorPalette.primary),
+                  prefixIcon: Icon(
+                    Icons.lock_outline,
+                    color: ColorPalette.primary,
+                  ),
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscureCurrent
-                          ? Icons.visibility_off
-                          : Icons.visibility,
+                      _obscureCurrent ? Icons.visibility_off : Icons.visibility,
                     ),
                     onPressed: () =>
                         setState(() => _obscureCurrent = !_obscureCurrent),
@@ -255,7 +258,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 validator: (value) {
                   if (_newPasswordController.text.isNotEmpty &&
                       (value == null || value.isEmpty)) {
-                    return appLocalization.t(AppStrings.pleaseEnterUsernameAndPassword);
+                    return appLocalization.t(
+                      AppStrings.pleaseEnterUsernameAndPassword,
+                    );
                   }
                   return null;
                 },
@@ -272,8 +277,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     icon: Icon(
                       _obscureNew ? Icons.visibility_off : Icons.visibility,
                     ),
-                    onPressed: () =>
-                        setState(() => _obscureNew = !_obscureNew),
+                    onPressed: () => setState(() => _obscureNew = !_obscureNew),
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),

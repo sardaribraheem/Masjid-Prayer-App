@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/app_data.dart';
+import '../providers/auth_provider.dart';
 import '../providers/question_provider.dart';
 import '../widgets/shared/empty_state.dart';
 import '../l10n/app_localization.dart';
@@ -9,7 +10,7 @@ import '../theme/app_theme.dart';
 
 /// Screen for imams/admins to view and answer questions
 class AdminQAScreen extends StatefulWidget {
-  const AdminQAScreen({Key? key}) : super(key: key);
+  const AdminQAScreen({super.key});
 
   @override
   State<AdminQAScreen> createState() => _AdminQAScreenState();
@@ -54,6 +55,16 @@ class _AdminQAScreenState extends State<AdminQAScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    if (!authProvider.isSuperAdmin &&
+        authProvider.currentUser?.canManageMasjid(AppData.selectedMasjid?.id) !=
+            true) {
+      return Scaffold(
+        body: Center(
+          child: Text(appLocalization.t('manager_approval_required')),
+        ),
+      );
+    }
     final questions = _getFilteredQuestions();
 
     return Scaffold(
@@ -101,28 +112,30 @@ class _AdminQAScreenState extends State<AdminQAScreen> {
             child: context.watch<QuestionProvider>().isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : questions.isEmpty
-                    ? EmptyState(
-                        icon: Icons.inbox_outlined,
-                        title: appLocalization.t(AppStrings.noQuestionsYet),
-                        subtitle: appLocalization.t(AppStrings.questionsWillAppearHereAdmin),
-                        actionLabel: appLocalization.t(AppStrings.refresh),
-                        onAction: _loadQuestions,
-                      )
-                    : RefreshIndicator(
-                        onRefresh: _loadQuestions,
-                        child: ListView.builder(
-                          itemCount: questions.length,
-                          padding: const EdgeInsets.all(12),
-                          itemBuilder: (context, index) {
-                            return _QuestionCard(
-                              question: questions[index],
-                              onAnswerTap: () {
-                                _showAnswerDialog(context, questions[index]);
-                              },
-                            );
+                ? EmptyState(
+                    icon: Icons.inbox_outlined,
+                    title: appLocalization.t(AppStrings.noQuestionsYet),
+                    subtitle: appLocalization.t(
+                      AppStrings.questionsWillAppearHereAdmin,
+                    ),
+                    actionLabel: appLocalization.t(AppStrings.refresh),
+                    onAction: _loadQuestions,
+                  )
+                : RefreshIndicator(
+                    onRefresh: _loadQuestions,
+                    child: ListView.builder(
+                      itemCount: questions.length,
+                      padding: const EdgeInsets.all(12),
+                      itemBuilder: (context, index) {
+                        return _QuestionCard(
+                          question: questions[index],
+                          onAnswerTap: () {
+                            _showAnswerDialog(context, questions[index]);
                           },
-                        ),
-                      ),
+                        );
+                      },
+                    ),
+                  ),
           ),
         ],
       ),
@@ -131,8 +144,7 @@ class _AdminQAScreenState extends State<AdminQAScreen> {
 
   /// Show dialog to answer a question
   void _showAnswerDialog(BuildContext context, Question question) {
-    final answerController =
-        TextEditingController(text: question.answer ?? '');
+    final answerController = TextEditingController(text: question.answer ?? '');
 
     showDialog(
       context: context,
@@ -157,7 +169,9 @@ class _AdminQAScreenState extends State<AdminQAScreen> {
                       '${appLocalization.t(AppStrings.questionFrom)} ${question.userName}',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -196,8 +210,12 @@ class _AdminQAScreenState extends State<AdminQAScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
+              final provider = context.read<QuestionProvider>();
+              final navigator = Navigator.of(context);
+              final messenger = ScaffoldMessenger.of(context);
+
               if (answerController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                messenger.showSnackBar(
                   SnackBar(
                     content: Text(
                       appLocalization.t(AppStrings.pleaseEnterAnAnswer),
@@ -207,21 +225,21 @@ class _AdminQAScreenState extends State<AdminQAScreen> {
                 return;
               }
 
-              // Save the answer via provider
-              await context.read<QuestionProvider>().answerQuestion(
-                    AppData.selectedMasjid?.id ?? '',
-                    question.id,
-                    answerController.text.trim(),
-                  );
+              await provider.answerQuestion(
+                AppData.selectedMasjid?.id ?? '',
+                question.id,
+                answerController.text.trim(),
+              );
 
-              ScaffoldMessenger.of(context).showSnackBar(
+              if (!mounted) return;
+              messenger.showSnackBar(
                 SnackBar(
                   content: Text(appLocalization.t(AppStrings.answerSaved)),
                   backgroundColor: ColorPalette.success,
                 ),
               );
 
-              Navigator.pop(context);
+              navigator.pop();
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: ColorPalette.primary,
@@ -273,7 +291,9 @@ class _FilterChip extends StatelessWidget {
               size: 18,
               color: isSelected
                   ? Theme.of(context).colorScheme.onPrimary
-                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                  : Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.6),
             ),
             const SizedBox(width: 8),
             Text(
@@ -281,9 +301,10 @@ class _FilterChip extends StatelessWidget {
               style: TextStyle(
                 color: isSelected
                     ? Theme.of(context).colorScheme.onPrimary
-                    : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                fontWeight:
-                    isSelected ? FontWeight.bold : FontWeight.normal,
+                    : Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.6),
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
             ),
           ],
@@ -319,7 +340,7 @@ class _QuestionCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        question.userName,
+                        question.displayName,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
@@ -331,7 +352,9 @@ class _QuestionCard extends StatelessWidget {
                         _formatTime(question.timestamp),
                         style: TextStyle(
                           fontSize: 12,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
                     ],
@@ -395,7 +418,9 @@ class _QuestionCard extends StatelessWidget {
                     appLocalization.t(AppStrings.question),
                     style: TextStyle(
                       fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.6),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -425,7 +450,9 @@ class _QuestionCard extends StatelessWidget {
                       appLocalization.t(AppStrings.answerText),
                       style: TextStyle(
                         fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.6),
                         fontWeight: FontWeight.bold,
                       ),
                     ),

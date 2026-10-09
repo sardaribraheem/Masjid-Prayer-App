@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:provider/provider.dart';
@@ -36,7 +37,10 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     super.dispose();
   }
 
-  /// Authenticate admin using Firebase Auth
+  /// Authenticate an imam/admin using the real Firestore user record rather than
+  /// the legacy masjid.username == auth email lookup. This avoids the login trap
+  /// where a normal user account can never become a masjid manager unless their
+  /// UID is linked to the correct masjid.
   Future<void> handleLogin() async {
     final email = emailController.text.trim();
     final password = passwordController.text;
@@ -56,77 +60,76 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     });
 
     try {
-      // Sign in with Firebase Auth
       final credential = await _firebaseAuth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      if (credential.user != null) {
-        // Find the masjid associated with this admin
-        final masjids = await _firebaseService.getAllMasjids();
-        Masjid? foundMasjid;
-
-        for (var masjid in masjids) {
-          if (masjid.username == email) {
-            foundMasjid = masjid;
-            break;
-          }
-        }
-
-        if (foundMasjid != null) {
-          await _storageService.saveAdminLoginStatus(
-            foundMasjid.id,
-            email,
+      final firebaseUser = credential.user;
+      if (firebaseUser == null) {
+        setState(() {
+          errorMessage = appLocalization.t(
+            AppStrings.invalidUsernameOrPassword,
           );
-          AppData.selectedMasjid = foundMasjid;
-          AppData.selectedMasjidId = foundMasjid.id;
+        });
+        return;
+      }
 
-          if (mounted) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AdminPanelScreen()),
-            );
-          }
-        } else {
-          // Also check local data
-          Masjid? localMasjid;
-          for (var masjid in AppData.allMasjids) {
-            if (masjid.username == email) {
-              localMasjid = masjid;
-              break;
-            }
-          }
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(firebaseUser.uid)
+          .get();
 
-          if (localMasjid != null) {
-            await _storageService.saveAdminLoginStatus(
-              localMasjid.id,
-              email,
-            );
-            AppData.selectedMasjid = localMasjid;
-            AppData.selectedMasjidId = localMasjid.id;
+      final userData = userDoc.data() ?? const <String, dynamic>{};
+      final role = UserRole.fromValue(userData['role'] as String?);
+      final masjidId = userData['masjidId'] as String?;
 
-            if (mounted) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AdminPanelScreen()),
-              );
-            }
-          } else {
-            setState(() {
-              errorMessage = appLocalization.t(
-                AppStrings.invalidUsernameOrPassword,
-              );
-            });
-          }
-        }
+      if (role != UserRole.imam && role != UserRole.admin) {
+        setState(() {
+          errorMessage =
+              'This account is not linked to a masjid as an imam/admin.';
+        });
+        return;
+      }
+
+      if (masjidId == null || masjidId.isEmpty) {
+        setState(() {
+          errorMessage =
+              'This masjid manager account is not assigned to a masjid yet.';
+        });
+        return;
+      }
+
+      final masjid = await _firebaseService.getMasjidById(masjidId);
+      if (masjid == null) {
+        setState(() {
+          errorMessage = 'The assigned masjid could not be found.';
+        });
+        return;
+      }
+
+      await _storageService.saveAdminLoginStatus(masjid.id, email);
+      AppData.selectedMasjid = masjid;
+      AppData.selectedMasjidId = masjid.id;
+
+      if (mounted) {
+        await context.read<AuthProvider>().hydrateUser(firebaseUser.uid);
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AdminPanelScreen()),
+        );
       }
     } on auth.FirebaseAuthException catch (e) {
       setState(() {
         if (e.code == 'user-not-found') {
-          errorMessage = appLocalization.t(AppStrings.invalidUsernameOrPassword);
+          errorMessage = appLocalization.t(
+            AppStrings.invalidUsernameOrPassword,
+          );
         } else if (e.code == 'wrong-password') {
-          errorMessage = appLocalization.t(AppStrings.invalidUsernameOrPassword);
+          errorMessage = appLocalization.t(
+            AppStrings.invalidUsernameOrPassword,
+          );
         } else {
           errorMessage = e.message ?? 'Login failed';
         }
@@ -221,10 +224,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                     ),
                     child: Text(
                       errorMessage!,
-                      style: TextStyle(
-                        color: ColorPalette.error,
-                        fontSize: 14,
-                      ),
+                      style: TextStyle(color: ColorPalette.error, fontSize: 14),
                     ),
                   ),
                 ),
@@ -265,31 +265,61 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: isLoading ? null : () async {
-                    final authProvider = context.read<AuthProvider>();
-                    final success = await authProvider.signInWithGoogle();
-                    if (!mounted) return;
-                    if (success) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const AdminPanelScreen()),
-                      );
-                    } else if (authProvider.error != null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(authProvider.error!),
-                          backgroundColor: ColorPalette.error,
-                        ),
-                      );
-                    }
-                  },
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          final authProvider = context.read<AuthProvider>();
+                          final scaffoldMessenger = ScaffoldMessenger.of(
+                            context,
+                          );
+                          final navigator = Navigator.of(context);
+                          final success = await authProvider.signInWithGoogle();
+                          if (!mounted) return;
+                          if (success) {
+                            final user = authProvider.currentUser;
+                            if (user == null ||
+                                !user.isAdminOrImam ||
+                                user.masjidId == null) {
+                              scaffoldMessenger.showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    appLocalization.t(
+                                      'manager_approval_required',
+                                    ),
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+                            final masjid = await _firebaseService.getMasjidById(
+                              user.masjidId!,
+                            );
+                            if (!mounted || masjid == null) return;
+                            AppData.selectedMasjid = masjid;
+                            AppData.selectedMasjidId = masjid.id;
+                            navigator.push(
+                              MaterialPageRoute(
+                                builder: (_) => const AdminPanelScreen(),
+                              ),
+                            );
+                          } else if (authProvider.error != null) {
+                            scaffoldMessenger.showSnackBar(
+                              SnackBar(
+                                content: Text(authProvider.error!),
+                                backgroundColor: ColorPalette.error,
+                              ),
+                            );
+                          }
+                        },
                   icon: const Icon(Icons.login, color: Colors.black54),
                   label: const Text('Sign in with Google'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.black87,
                     side: const BorderSide(color: Colors.grey),
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
               ),

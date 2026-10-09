@@ -1,13 +1,15 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import '../models/app_data.dart';
-import '../services/firebase_service.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import '../l10n/app_localization.dart';
 import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
 
 /// Screen for registering a new masjid with Firebase Auth
-/// Creates a Firebase Auth account + masjid document in Firestore
+/// Creates a member account and a pending masjid approval request.
 class AdminRegisterScreen extends StatefulWidget {
   const AdminRegisterScreen({super.key});
 
@@ -21,7 +23,6 @@ class _AdminRegisterScreenState extends State<AdminRegisterScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
-  final FirebaseService _firebaseService = FirebaseService();
   final auth.FirebaseAuth _firebaseAuth = auth.FirebaseAuth.instance;
 
   String? errorMessage;
@@ -40,6 +41,7 @@ class _AdminRegisterScreenState extends State<AdminRegisterScreen> {
 
   /// Handle the registration of a new masjid using Firebase Auth
   Future<void> handleRegister() async {
+    if (isLoading) return;
     final masjidName = masjidNameController.text.trim();
     final location = locationController.text.trim();
     final email = emailController.text.trim();
@@ -55,6 +57,13 @@ class _AdminRegisterScreenState extends State<AdminRegisterScreen> {
         errorMessage = appLocalization.t(AppStrings.allFieldsRequired);
         successMessage = null;
       });
+      return;
+    }
+
+    if (masjidName.length > 100 || location.length > 500) {
+      setState(
+        () => errorMessage = appLocalization.t('masjid_request_too_long'),
+      );
       return;
     }
 
@@ -79,6 +88,8 @@ class _AdminRegisterScreenState extends State<AdminRegisterScreen> {
       errorMessage = null;
     });
 
+    auth.User? applicant;
+    bool requestSaved = false;
     try {
       // Step 1: Create Firebase Auth account
       final credential = await _firebaseAuth.createUserWithEmailAndPassword(
@@ -87,60 +98,67 @@ class _AdminRegisterScreenState extends State<AdminRegisterScreen> {
       );
 
       if (credential.user == null) {
+        if (!mounted) return;
         setState(() {
           errorMessage = 'Failed to create account';
         });
         return;
       }
 
+      applicant = credential.user;
       // Step 2: Update display name
       await credential.user!.updateDisplayName(masjidName);
 
-      // Step 3: Create masjid in Firestore with the admin's UID
-      final newMasjid = Masjid(
-        name: masjidName,
-        location: location,
-        username: email,
-        prayerTimes: [
-          PrayerTime(name: 'Fajr', time: ''),
-          PrayerTime(name: 'Dhuhr', time: ''),
-          PrayerTime(name: 'Asr', time: ''),
-          PrayerTime(name: 'Maghrib', time: ''),
-          PrayerTime(name: 'Isha', time: ''),
-        ],
-        jummahTime: '',
-      );
+      // Register the applicant and request together. Only trusted approval
+      // creates a masjid and grants imam access.
+      final firestore = FirebaseFirestore.instance;
+      final batch = firestore.batch();
+      batch.set(firestore.collection('users').doc(applicant!.uid), {
+        'username': masjidName,
+        'email': applicant.email,
+        'role': UserRole.muqtaddi.value,
+        'verificationStatus': VerificationStatus.none.value,
+        'eventPermission': EventPermission.none.value,
+        'masjidId': null,
+        'masjidName': null,
+        'createdAt': DateTime.now().toIso8601String(),
+      });
+      batch.set(firestore.collection('claimRequests').doc(), {
+        'masjidId': null,
+        'imamUid': applicant.uid,
+        'imamName': masjidName,
+        'imamEmail': applicant.email,
+        'masjidName': masjidName,
+        'masjidLocation': location,
+        'status': 'pending',
+        'type': 'new_masjid',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      await batch.commit();
+      requestSaved = true;
+      if (mounted) {
+        await context.read<AuthProvider>().hydrateUser(applicant.uid);
+      }
 
-      final success = await _firebaseService.registerMasjid(newMasjid);
-
-      if (success) {
-        AppData.allMasjids.add(newMasjid);
-
-        if (mounted) {
-          setState(() {
-            successMessage = appLocalization.t(AppStrings.registrationSuccess);
-            errorMessage = null;
-          });
-
-          // Clear the form
-          masjidNameController.clear();
-          locationController.clear();
-          emailController.clear();
-          passwordController.clear();
-          confirmPasswordController.clear();
-
-          // Go back after 2 seconds
-          await Future.delayed(const Duration(seconds: 2));
-          if (mounted) {
-            Navigator.pop(context);
-          }
-        }
-      } else {
+      if (mounted) {
         setState(() {
-          errorMessage = appLocalization.t(AppStrings.registrationFailed);
+          successMessage = appLocalization.t('masjid_request_submitted');
+          errorMessage = null;
         });
+
+        masjidNameController.clear();
+        locationController.clear();
+        emailController.clear();
+        passwordController.clear();
+        confirmPasswordController.clear();
+
+        await Future.delayed(const Duration(seconds: 2));
+        if (mounted) {
+          Navigator.pop(context);
+        }
       }
     } on auth.FirebaseAuthException catch (e) {
+      if (!mounted) return;
       setState(() {
         if (e.code == 'email-already-in-use') {
           errorMessage = 'An account with this email already exists';
@@ -151,11 +169,25 @@ class _AdminRegisterScreenState extends State<AdminRegisterScreen> {
         }
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         errorMessage =
             '${appLocalization.t(AppStrings.registrationFailed)}: $e';
       });
     } finally {
+      // No Firestore documents were committed if request submission failed.
+      // Roll back the just-created Auth account when possible.
+      if (!requestSaved && applicant != null) {
+        try {
+          await applicant.delete();
+        } catch (_) {
+          if (mounted) {
+            setState(() {
+              errorMessage = appLocalization.t('masjid_request_retry_login');
+            });
+          }
+        }
+      }
       if (mounted) {
         setState(() {
           isLoading = false;
@@ -197,6 +229,7 @@ class _AdminRegisterScreenState extends State<AdminRegisterScreen> {
               // Masjid Name field
               TextField(
                 controller: masjidNameController,
+                maxLength: 100,
                 enabled: !isLoading,
                 decoration: InputDecoration(
                   labelText: appLocalization.t(AppStrings.masjidName),
@@ -212,6 +245,7 @@ class _AdminRegisterScreenState extends State<AdminRegisterScreen> {
               // Location field
               TextField(
                 controller: locationController,
+                maxLength: 500,
                 enabled: !isLoading,
                 decoration: InputDecoration(
                   labelText: appLocalization.t(AppStrings.location),
@@ -286,10 +320,7 @@ class _AdminRegisterScreenState extends State<AdminRegisterScreen> {
                     ),
                     child: Text(
                       errorMessage!,
-                      style: TextStyle(
-                        color: ColorPalette.error,
-                        fontSize: 14,
-                      ),
+                      style: TextStyle(color: ColorPalette.error, fontSize: 14),
                     ),
                   ),
                 ),

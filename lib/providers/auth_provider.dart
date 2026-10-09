@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' as firestore;
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:google_sign_in/google_sign_in.dart' as google;
 import '../models/app_data.dart' as app;
+import '../services/account_deletion_service.dart';
 
 /// Provides authentication state and operations using Firebase Auth.
 ///
@@ -27,6 +29,13 @@ class AuthProvider extends ChangeNotifier {
     return _googleSignIn ??= google.GoogleSignIn();
   }
 
+  StreamSubscription<auth.User?>? _authSubscription;
+  StreamSubscription<firestore.DocumentSnapshot<Map<String, dynamic>>>?
+  _userSubscription;
+  int _authGeneration = 0;
+  int _profileRevision = 0;
+  bool _isSuperAdmin = false;
+  bool get isSuperAdmin => isLoggedIn && _isSuperAdmin;
   app.User? _currentUser;
   bool _isLoading = false;
   String? _error;
@@ -38,7 +47,9 @@ class AuthProvider extends ChangeNotifier {
 
   AuthProvider() {
     // Listen to Firebase Auth state changes
-    _firebaseAuth.authStateChanges().listen(_onAuthStateChanged);
+    _authSubscription = _firebaseAuth.authStateChanges().listen(
+      _onAuthStateChanged,
+    );
   }
 
   /// Handle Firebase Auth state changes.
@@ -48,6 +59,11 @@ class AuthProvider extends ChangeNotifier {
   /// that resolves, the user is shown as a plain `muqtaddi` so they can never
   /// appear with elevated permissions spuriously.
   void _onAuthStateChanged(auth.User? firebaseUser) {
+    final generation = ++_authGeneration;
+    _profileRevision = 0;
+    _userSubscription?.cancel();
+    _userSubscription = null;
+    _isSuperAdmin = false;
     if (firebaseUser == null) {
       app.AppData.currentUser = app.User(
         id: '',
@@ -69,6 +85,34 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       // Best-effort: hydrate authoritative role info from Firestore.
       hydrateUser(firebaseUser.uid);
+      _userSubscription = _firestore
+          .collection('users')
+          .doc(firebaseUser.uid)
+          .snapshots()
+          .listen(
+            (doc) {
+              if (generation != _authGeneration) return;
+              _profileRevision++;
+              if (doc.exists) {
+                _applyUserData(firebaseUser.uid, doc.data()!);
+              } else {
+                _currentUser = app.User(
+                  id: firebaseUser.uid,
+                  username: firebaseUser.displayName ?? 'User',
+                  email: firebaseUser.email ?? '',
+                  role: app.UserRole.muqtaddi,
+                  isLoggedIn: true,
+                );
+                app.AppData.currentUser = _currentUser!;
+                notifyListeners();
+              }
+            },
+            onError: (Object error) {
+              if (generation != _authGeneration) return;
+              _error = 'Could not refresh your account permissions.';
+              notifyListeners();
+            },
+          );
     }
   }
 
@@ -79,32 +123,53 @@ class AuthProvider extends ChangeNotifier {
   /// until the document loads is a safe (never elevated) state, and this is
   /// called on every auth-state change.
   Future<void> hydrateUser(String uid) async {
+    final generation = _authGeneration;
+    final profileRevision = _profileRevision;
+    final firebaseUser = _firebaseAuth.currentUser;
+    if (firebaseUser == null || firebaseUser.uid != uid) return;
     try {
-      final doc =
-          await _firestore.collection('users').doc(uid).get();
-      if (!doc.exists) return;
-      final data = doc.data() ?? const <String, dynamic>{};
-      final stored = app.User.fromJson({
-        'id': uid,
-        ...data,
-      });
-      _currentUser = app.User(
-        id: uid,
-        username: stored.username,
-        email: stored.email,
-        role: stored.role,
-        verificationStatus: stored.verificationStatus,
-        eventPermission: stored.eventPermission,
-        masjidId: stored.masjidId,
-        masjidName: stored.masjidName,
-        isLoggedIn: true,
-        createdAt: stored.createdAt,
-      );
-      app.AppData.currentUser = _currentUser!;
-      notifyListeners();
-    } catch (e) {
-      // Safe default (muqtaddi) already in place; no elevated role shown.
+      final token = await firebaseUser.getIdTokenResult();
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (generation != _authGeneration ||
+          _firebaseAuth.currentUser?.uid != uid) {
+        return;
+      }
+      _isSuperAdmin = token.claims?['superAdmin'] == true;
+      if (doc.exists && profileRevision == _profileRevision) {
+        _applyUserData(uid, doc.data()!);
+      } else {
+        notifyListeners();
+      }
+    } catch (_) {
+      // A failed lookup never grants management or super-admin access.
     }
+  }
+
+  void _applyUserData(String uid, Map<String, dynamic> data) {
+    if (_firebaseAuth.currentUser?.uid != uid) return;
+    final stored = app.User.fromJson({...data, 'id': uid});
+    _currentUser = app.User(
+      id: uid,
+      username: stored.username,
+      email: stored.email,
+      role: stored.role,
+      verificationStatus: stored.verificationStatus,
+      eventPermission: stored.eventPermission,
+      masjidId: stored.masjidId,
+      masjidName: stored.masjidName,
+      isLoggedIn: true,
+      createdAt: stored.createdAt,
+    );
+    app.AppData.currentUser = _currentUser!;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _authGeneration++;
+    _authSubscription?.cancel();
+    _userSubscription?.cancel();
+    super.dispose();
   }
 
   /// Auth-state listener that also (re)hydrates role data when AuthProvider is
@@ -127,6 +192,11 @@ class AuthProvider extends ChangeNotifier {
     String? masjidId,
     String? masjidName,
   }) async {
+    if (displayName.trim().isEmpty || displayName.trim().length > 100) {
+      _error = 'Name must contain between 1 and 100 characters.';
+      notifyListeners();
+      return false;
+    }
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -145,8 +215,8 @@ class AuthProvider extends ChangeNotifier {
       // only be elevated by an admin/imam (enforced by Firestore rules).
       final uid = credential.user!.uid;
       await _firestore.collection('users').doc(uid).set({
-        'username': displayName,
-        'email': email.trim(),
+        'username': displayName.trim(),
+        'email': credential.user!.email,
         'role': app.UserRole.muqtaddi.value,
         'verificationStatus': app.VerificationStatus.none.value,
         'eventPermission': app.EventPermission.none.value,
@@ -155,6 +225,7 @@ class AuthProvider extends ChangeNotifier {
         'createdAt': DateTime.now().toIso8601String(),
       });
 
+      await hydrateUser(_firebaseAuth.currentUser!.uid);
       _isLoading = false;
       notifyListeners();
       return true;
@@ -177,6 +248,64 @@ class AuthProvider extends ChangeNotifier {
         email: email.trim(),
         password: password,
       );
+      await hydrateUser(_firebaseAuth.currentUser!.uid);
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = _readableAuthError(e);
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Request verification as a muqtaddi for the selected masjid.
+  /// The request is stored on the authoritative Firestore user doc and keeps
+  /// the user's role as `muqtaddi` until an imam/admin approves it.
+  Future<bool> requestVerification() async {
+    final currentUser = _currentUser;
+    if (currentUser == null || currentUser.id.isEmpty) {
+      _error = 'Please log in to request verification.';
+      notifyListeners();
+      return false;
+    }
+
+    if (currentUser.role != app.UserRole.muqtaddi ||
+        ![
+          app.VerificationStatus.none,
+          app.VerificationStatus.rejected,
+        ].contains(currentUser.verificationStatus)) {
+      _error = 'Only muqtaddis can request verification.';
+      notifyListeners();
+      return false;
+    }
+
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final masjid = app.AppData.selectedMasjid;
+      if (masjid == null || masjid.id.isEmpty) {
+        throw StateError('Select a masjid first.');
+      }
+      final updatedUser = app.User.fromJson({
+        ...currentUser.toJson(),
+        'id': currentUser.id,
+        'isLoggedIn': true,
+        'masjidId': masjid.id,
+        'masjidName': masjid.name,
+        'verificationStatus': 'pending',
+      });
+      await _firestore.collection('users').doc(currentUser.id).update({
+        'verificationStatus': updatedUser.verificationStatus.value,
+        'masjidId': masjid.id,
+        'masjidName': masjid.name,
+      });
+
+      _currentUser = updatedUser;
+      app.AppData.currentUser = updatedUser;
       _isLoading = false;
       notifyListeners();
       return true;
@@ -213,7 +342,9 @@ class AuthProvider extends ChangeNotifier {
         idToken: googleAuth.idToken,
       );
 
-      final userCredential = await _firebaseAuth.signInWithCredential(credential);
+      final userCredential = await _firebaseAuth.signInWithCredential(
+        credential,
+      );
       final firebaseUser = userCredential.user;
       if (firebaseUser == null) {
         _error = 'Sign-in failed: no user returned';
@@ -238,6 +369,7 @@ class AuthProvider extends ChangeNotifier {
         });
       }
 
+      await hydrateUser(uid);
       _isLoading = false;
       notifyListeners();
       return true;
@@ -259,6 +391,61 @@ class AuthProvider extends ChangeNotifier {
     app.AppData.logout();
     _currentUser = app.AppData.currentUser;
     notifyListeners();
+  }
+
+  /// Delete the current user's account (Firebase Auth + Firestore user doc cleanup).
+  Future<bool> deleteAccount({String? password}) async {
+    if (_isLoading) return false;
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      final user = _firebaseAuth.currentUser;
+      if (user == null) {
+        throw StateError('Please sign in before deleting your account.');
+      }
+      if (user.providerData.any(
+        (provider) => provider.providerId == 'password',
+      )) {
+        if (password == null || password.isEmpty) {
+          throw StateError('Enter your current password.');
+        }
+        await user.reauthenticateWithCredential(
+          auth.EmailAuthProvider.credential(
+            email: user.email!,
+            password: password,
+          ),
+        );
+      } else if (user.providerData.any(
+        (provider) => provider.providerId == 'google.com',
+      )) {
+        final googleUser = await _signIn.signIn();
+        if (googleUser == null) {
+          throw StateError('Reauthentication was cancelled.');
+        }
+        final googleAuth = await googleUser.authentication;
+        await user.reauthenticateWithCredential(
+          auth.GoogleAuthProvider.credential(
+            accessToken: googleAuth.accessToken,
+            idToken: googleAuth.idToken,
+          ),
+        );
+      } else {
+        throw StateError(
+          'Sign in with a supported account provider to delete your account.',
+        );
+      }
+      await AccountDeletionService().removeFirestoreData(user);
+      await user.delete();
+      await signOut();
+      return true;
+    } catch (error) {
+      _error = _readableAuthError(error);
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   /// Clear any error message

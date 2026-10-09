@@ -56,6 +56,9 @@ dependencies:
   # Location services
   geolocator: ^10.1.0
 
+  # URL launcher for support email
+  url_launcher: ^6.3.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

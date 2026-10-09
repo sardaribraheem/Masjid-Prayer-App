@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/app_data.dart';
 import '../providers/event_provider.dart';
+import '../providers/auth_provider.dart';
+import 'admin_events_screen.dart';
 import '../widgets/event_search_bar.dart';
 import '../widgets/category_slider.dart';
 import '../widgets/enhanced_event_card.dart';
@@ -13,7 +15,7 @@ import '../theme/app_theme.dart';
 
 /// Community Page - Shows events from masjids with search and category filtering
 class CommunityPage extends StatefulWidget {
-  const CommunityPage({Key? key}) : super(key: key);
+  const CommunityPage({super.key});
 
   @override
   State<CommunityPage> createState() => _CommunityPageState();
@@ -56,25 +58,88 @@ class _CommunityPageState extends State<CommunityPage> {
     }
   }
 
+  Future<void> _proposeEvent() async {
+    final auth = context.read<AuthProvider>();
+    final user = auth.currentUser;
+    final masjid = AppData.selectedMasjid;
+    if (user == null ||
+        !user.canSubmitEvents ||
+        masjid == null ||
+        user.masjidId != masjid.id) {
+      return;
+    }
+    final result = await showEventProposalForm(context);
+    if (!mounted ||
+        result == null ||
+        context.read<AuthProvider>().currentUser?.id != user.id) {
+      return;
+    }
+    final success = await context.read<EventProvider>().addEvent(
+      Event(
+        id: '',
+        title: result.title,
+        description: result.description,
+        masjidId: masjid.id,
+        masjidName: masjid.name,
+        eventDate: result.eventDate,
+        startTime: result.startTime,
+        endTime: result.endTime,
+        location: result.location,
+        category: result.category,
+        status: user.canPublishEventsDirectly
+            ? EventStatus.approved
+            : EventStatus.pending,
+        createdByUid: user.id,
+        createdByName: user.username,
+      ),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          appLocalization.t(
+            success ? 'event_proposal_submitted' : 'error_occurred',
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Get category definitions with localized labels
   List<CategoryItem> _getCategories() {
     return [
-      CategoryItem(id: 'all', label: appLocalization.t(AppStrings.allCategories), icon: Icons.apps),
-      CategoryItem(id: 'Taleem', label: appLocalization.t(AppStrings.taleem), icon: Icons.school),
-      CategoryItem(id: 'Dars', label: appLocalization.t(AppStrings.dars), icon: Icons.book),
+      CategoryItem(
+        id: 'all',
+        label: appLocalization.t(AppStrings.allCategories),
+        icon: Icons.apps,
+      ),
+      CategoryItem(
+        id: 'Taleem',
+        label: appLocalization.t(AppStrings.taleem),
+        icon: Icons.school,
+      ),
+      CategoryItem(
+        id: 'Dars',
+        label: appLocalization.t(AppStrings.dars),
+        icon: Icons.book,
+      ),
       CategoryItem(
         id: 'Jammat',
         label: appLocalization.t(AppStrings.jammat),
         icon: Icons.group,
       ),
-      CategoryItem(id: 'Gasht', label: appLocalization.t(AppStrings.gasht), icon: Icons.directions_walk),
+      CategoryItem(
+        id: 'Gasht',
+        label: appLocalization.t(AppStrings.gasht),
+        icon: Icons.directions_walk,
+      ),
     ];
   }
 
   List<Event> _getFilteredEvents() {
     final masjidId = AppData.selectedMasjid?.id ?? '';
     final provider = context.watch<EventProvider>();
-    List<Event> events = provider.getEventsByMasjid(masjidId);
+    List<Event> events = provider.getApprovedEventsByMasjid(masjidId);
 
     // Apply category filter
     if (_selectedCategory != 'all') {
@@ -110,6 +175,16 @@ class _CommunityPageState extends State<CommunityPage> {
         backgroundColor: ColorPalette.primary,
         elevation: 0,
       ),
+      floatingActionButton:
+          context.watch<AuthProvider>().currentUser?.canSubmitEvents == true &&
+              context.watch<AuthProvider>().currentUser?.masjidId ==
+                  AppData.selectedMasjid?.id
+          ? FloatingActionButton.extended(
+              onPressed: _proposeEvent,
+              icon: const Icon(Icons.add),
+              label: Text(appLocalization.t('propose_event')),
+            )
+          : null,
       body: Column(
         children: [
           // Search Bar
@@ -163,25 +238,25 @@ class _CommunityPageState extends State<CommunityPage> {
             child: context.watch<EventProvider>().isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : filteredEvents.isEmpty
-                    ? EmptyState(
-                        icon: Icons.event_outlined,
-                        title: appLocalization.t(AppStrings.noEvents),
-                        subtitle: appLocalization.t(AppStrings.eventsWillAppearHere),
-                        actionLabel: appLocalization.t(AppStrings.refresh),
-                        onAction: _loadEvents,
-                      )
-                    : RefreshIndicator(
-                        onRefresh: _loadEvents,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.only(bottom: 20, top: 8),
-                          itemCount: filteredEvents.length,
-                          itemBuilder: (context, index) {
-                            return EnhancedEventCard(
-                              event: filteredEvents[index],
-                            );
-                          },
-                        ),
-                      ),
+                ? EmptyState(
+                    icon: Icons.event_outlined,
+                    title: appLocalization.t(AppStrings.noEvents),
+                    subtitle: appLocalization.t(
+                      AppStrings.eventsWillAppearHere,
+                    ),
+                    actionLabel: appLocalization.t(AppStrings.refresh),
+                    onAction: _loadEvents,
+                  )
+                : RefreshIndicator(
+                    onRefresh: _loadEvents,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.only(bottom: 20, top: 8),
+                      itemCount: filteredEvents.length,
+                      itemBuilder: (context, index) {
+                        return EnhancedEventCard(event: filteredEvents[index]);
+                      },
+                    ),
+                  ),
           ),
         ],
       ),
@@ -218,7 +293,9 @@ class _FilterButton extends StatelessWidget {
           style: TextStyle(
             color: isSelected
                 ? Theme.of(context).colorScheme.onPrimary
-                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                : Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.6),
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             fontSize: 12,
           ),

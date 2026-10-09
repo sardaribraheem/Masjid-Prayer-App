@@ -8,10 +8,10 @@ class EventSearchBar extends StatefulWidget {
   final String hintText;
 
   const EventSearchBar({
-    Key? key,
+    super.key,
     required this.onSearchChanged,
     this.hintText = 'Search events...',
-  }) : super(key: key);
+  });
 
   @override
   State<EventSearchBar> createState() => _EventSearchBarState();

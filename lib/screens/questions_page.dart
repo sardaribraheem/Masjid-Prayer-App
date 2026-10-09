@@ -9,6 +9,7 @@ import '../l10n/app_localization.dart';
 import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
 import 'muqtaddi_login_screen.dart';
+import '../widgets/post_comments.dart';
 
 /// Questions Page - Users can ask questions and see answered questions
 ///
@@ -16,7 +17,7 @@ import 'muqtaddi_login_screen.dart';
 /// see a login prompt instead of the form. Questions are attributed to the
 /// logged-in user's `users/{uid}` username — no manual name field.
 class QuestionsPage extends StatefulWidget {
-  const QuestionsPage({Key? key}) : super(key: key);
+  const QuestionsPage({super.key});
 
   @override
   State<QuestionsPage> createState() => _QuestionsPageState();
@@ -25,6 +26,8 @@ class QuestionsPage extends StatefulWidget {
 class _QuestionsPageState extends State<QuestionsPage> {
   final TextEditingController _questionController = TextEditingController();
   String _filterType = 'all'; // 'all', 'answered', 'unanswered'
+  bool _isAnonymous = false;
+  bool _isSubmitting = false;
 
   StreamSubscription<List<Question>>? _questionSub;
 
@@ -40,8 +43,9 @@ class _QuestionsPageState extends State<QuestionsPage> {
       _loadQuestions();
       final masjidId = AppData.selectedMasjid?.id ?? '';
       if (masjidId.isNotEmpty) {
-        _questionSub =
-            context.read<QuestionProvider>().subscribeToQuestions(masjidId);
+        _questionSub = context.read<QuestionProvider>().subscribeToQuestions(
+          masjidId,
+        );
       }
     });
   }
@@ -77,13 +81,19 @@ class _QuestionsPageState extends State<QuestionsPage> {
       return;
     }
 
+    if (_isSubmitting) return;
+    setState(() => _isSubmitting = true);
+    final postedAsAnonymous = _isAnonymous;
     final success = await context.read<QuestionProvider>().addQuestion(
-          userName: authProvider.currentUser?.username ?? 'Muqtaddi',
-          questionText: _questionController.text.trim(),
-          masjidId: AppData.selectedMasjid?.id ?? 'unknown',
-        );
+      userName: authProvider.currentUser?.username ?? 'Muqtaddi',
+      questionText: _questionController.text.trim(),
+      masjidId: AppData.selectedMasjid?.id ?? 'unknown',
+      createdByUid: authProvider.currentUser?.id,
+      isAnonymous: postedAsAnonymous,
+    );
 
     if (!mounted) return;
+    setState(() => _isSubmitting = false);
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -100,7 +110,11 @@ class _QuestionsPageState extends State<QuestionsPage> {
       );
     }
 
+    if (!success) return;
     _questionController.clear();
+    setState(() {
+      _isAnonymous = false;
+    });
   }
 
   /// Send guests to the Muqtaddi login screen before posting.
@@ -133,12 +147,6 @@ class _QuestionsPageState extends State<QuestionsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final masjidId = AppData.selectedMasjid?.id ?? '';
-    if (masjidId.isNotEmpty) {
-      // Ensure we're subscribed to real-time updates
-      context.read<QuestionProvider>().subscribeToQuestions(masjidId);
-    }
-
     final filteredQuestions = _getFilteredQuestions();
 
     return Scaffold(
@@ -168,6 +176,7 @@ class _QuestionsPageState extends State<QuestionsPage> {
                   TextField(
                     controller: _questionController,
                     maxLines: 3,
+                    maxLength: 4000,
                     decoration: InputDecoration(
                       hintText: appLocalization.t(AppStrings.yourQuestion),
                       prefixIcon: Padding(
@@ -187,10 +196,21 @@ class _QuestionsPageState extends State<QuestionsPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    title: const Text('Post anonymously'),
+                    value: _isAnonymous,
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() => _isAnonymous = value);
+                    },
+                  ),
+                  const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: _submitQuestion,
+                      onPressed: _isSubmitting ? null : _submitQuestion,
                       icon: const Icon(Icons.send),
                       label: Text(appLocalization.t(AppStrings.submitQuestion)),
                       style: ElevatedButton.styleFrom(
@@ -220,7 +240,8 @@ class _QuestionsPageState extends State<QuestionsPage> {
                   const SizedBox(height: 8),
                   Text(
                     appLocalization.t(
-                        AppStrings.guestCanReadLoginToParticipate),
+                      AppStrings.guestCanReadLoginToParticipate,
+                    ),
                     style: TextStyle(
                       fontSize: 13,
                       color: ColorPalette.lightTextSecondary,
@@ -275,27 +296,29 @@ class _QuestionsPageState extends State<QuestionsPage> {
             child: context.watch<QuestionProvider>().isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : filteredQuestions.isEmpty
-                    ? EmptyState(
-                        icon: Icons.inbox_outlined,
-                        title: appLocalization.t(AppStrings.noQuestions),
-                        subtitle: appLocalization.t(AppStrings.questionsWillAppearHere),
-                        actionLabel: appLocalization.t(AppStrings.refresh),
-                        onAction: _loadQuestions,
-                      )
-                    : RefreshIndicator(
-                        onRefresh: _loadQuestions,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          itemCount: filteredQuestions.length,
-                          itemBuilder: (context, index) {
-                            final question = filteredQuestions[index];
-                            return _QuestionCard(question: question);
-                          },
-                        ),
+                ? EmptyState(
+                    icon: Icons.inbox_outlined,
+                    title: appLocalization.t(AppStrings.noQuestions),
+                    subtitle: appLocalization.t(
+                      AppStrings.questionsWillAppearHere,
+                    ),
+                    actionLabel: appLocalization.t(AppStrings.refresh),
+                    onAction: _loadQuestions,
+                  )
+                : RefreshIndicator(
+                    onRefresh: _loadQuestions,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
                       ),
+                      itemCount: filteredQuestions.length,
+                      itemBuilder: (context, index) {
+                        final question = filteredQuestions[index];
+                        return _QuestionCard(question: question);
+                      },
+                    ),
+                  ),
           ),
         ],
       ),
@@ -330,7 +353,9 @@ class _FilterButton extends StatelessWidget {
           style: TextStyle(
             color: isSelected
                 ? Theme.of(context).colorScheme.onPrimary
-                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                : Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.6),
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             fontSize: 12,
           ),
@@ -381,7 +406,7 @@ class _QuestionCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        question.userName,
+                        question.displayName,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
@@ -393,7 +418,9 @@ class _QuestionCard extends StatelessWidget {
                         _formatTime(question.timestamp),
                         style: TextStyle(
                           fontSize: 11,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
                     ],
@@ -437,7 +464,7 @@ class _QuestionCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${appLocalization.t(AppStrings.question)} ${question.questionText}',
+                    question.questionText,
                     style: const TextStyle(fontSize: 13),
                   ),
                 ],
@@ -463,6 +490,7 @@ class _QuestionCard extends StatelessWidget {
                 ),
               ),
             ],
+            PostComments(masjidId: question.masjidId, postId: question.id),
           ],
         ),
       ),

@@ -45,7 +45,7 @@ class _ClaimMasjidScreenState extends State<ClaimMasjidScreen> {
     if (_allMasjids.isEmpty) {
       _allMasjids = List.from(AppData.allMasjids);
     }
-    setState(() => _isLoadingResults = false);
+    if (mounted) setState(() => _isLoadingResults = false);
   }
 
   void _searchMasjids(String query) {
@@ -66,11 +66,12 @@ class _ClaimMasjidScreenState extends State<ClaimMasjidScreen> {
   }
 
   Future<void> _submitClaim(Masjid masjid) async {
+    if (context.read<MasjidClaimProvider>().isLoading) return;
     final user = auth.FirebaseAuth.instance.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please sign in first')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please sign in first')));
       return;
     }
 
@@ -98,14 +99,15 @@ class _ClaimMasjidScreenState extends State<ClaimMasjidScreen> {
   }
 
   Future<void> _submitNewMasjid() async {
+    if (context.read<MasjidClaimProvider>().isLoading) return;
     final user = auth.FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
     if (_nameController.text.trim().isEmpty ||
         _locationController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all fields')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
       return;
     }
 
@@ -149,9 +151,9 @@ class _ClaimMasjidScreenState extends State<ClaimMasjidScreen> {
             // Search existing masjids
             Text(
               'Search for your masjid',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             TextField(
@@ -175,7 +177,10 @@ class _ClaimMasjidScreenState extends State<ClaimMasjidScreen> {
               (masjid) => Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
-                  leading: const Icon(Icons.mosque, color: ColorPalette.primary),
+                  leading: const Icon(
+                    Icons.mosque,
+                    color: ColorPalette.primary,
+                  ),
                   title: Text(masjid.name),
                   subtitle: Text(masjid.location),
                   trailing: ElevatedButton(
@@ -199,8 +204,8 @@ class _ClaimMasjidScreenState extends State<ClaimMasjidScreen> {
                 Text(
                   "Can't find your masjid?",
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),

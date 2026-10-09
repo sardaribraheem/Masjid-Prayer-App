@@ -51,11 +51,19 @@ class QuestionProvider extends ChangeNotifier {
   /// caller can cancel it in dispose().
   StreamSubscription<List<Question>> subscribeToQuestions(String masjidId) {
     _streamSub?.cancel();
-    final sub = _repository.getQuestionsStream(masjidId).listen((questions) {
-      _questions = questions;
-      _error = null;
-      notifyListeners();
-    });
+    final sub = _repository
+        .getQuestionsStream(masjidId)
+        .listen(
+          (questions) {
+            _questions = questions;
+            _error = null;
+            notifyListeners();
+          },
+          onError: (Object error) {
+            _error = error.toString();
+            notifyListeners();
+          },
+        );
     _streamSub = sub;
     return sub;
   }
@@ -71,20 +79,36 @@ class QuestionProvider extends ChangeNotifier {
     required String userName,
     required String questionText,
     required String masjidId,
+    String? createdByUid,
+    bool isAnonymous = false,
   }) async {
+    if (masjidId.isEmpty ||
+        createdByUid == null ||
+        questionText.trim().isEmpty ||
+        questionText.length > 4000) {
+      return false;
+    }
     final question = Question(
       id: '',
-      userName: userName,
+      userName: isAnonymous ? 'Anonymous' : userName,
       questionText: questionText,
       masjidId: masjidId,
       timestamp: DateTime.now(),
+      isAnonymous: isAnonymous,
+      createdByUid: createdByUid,
     );
 
     final success = await _repository.addQuestion(question);
     if (success) {
       // The stream listener will update the list automatically
       // Also sync to AppData for backward compatibility
-      AppData.addQuestion(userName, questionText, masjidId);
+      AppData.addQuestion(
+        userName,
+        questionText,
+        masjidId,
+        createdByUid: createdByUid,
+        isAnonymous: isAnonymous,
+      );
     }
     return success;
   }
@@ -95,7 +119,11 @@ class QuestionProvider extends ChangeNotifier {
     String questionId,
     String answer,
   ) async {
-    final success = await _repository.answerQuestion(masjidId, questionId, answer);
+    final success = await _repository.answerQuestion(
+      masjidId,
+      questionId,
+      answer,
+    );
     if (success) {
       // Also update AppData for backward compatibility
       AppData.answerQuestion(questionId, answer);

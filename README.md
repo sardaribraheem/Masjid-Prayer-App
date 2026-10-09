@@ -81,3 +81,8 @@ guest → muqtaddi (new account) → verifiedMuqtaddi → imam → admin
 - Verify every feature against REAL Firestore before marking it done.
 - **Never store plaintext passwords in Firestore** (Hassan Masjid's `password` field was stripped for exactly this reason).
 - Read `latesttodo.md` first — it is the authoritative Phase 1 roadmap and wears a ⚠️ READ-THIS-FIRST block with the current Firestore-access blocker.
+## Current launch work (8 October 2026)
+
+Use [launchplan.md](launchplan.md) for current implementation status; earlier completion claims above are historical and do not certify the current build. Android is the only MVP launch target. The final application ID and release signing remain pending. Notification scheduling and attendance registration are deferred.
+
+Local authorization and core account/member workflow changes pass the Firestore emulator suite and Flutter checks. Production still needs reviewed manager migration, the trusted administrator claim, new indexes/rules, and client/device acceptance. See [test instructions](test/firestore/README.md) and [administrator bootstrap instructions](scripts/admin/README.md). Nothing was deployed during the local review.

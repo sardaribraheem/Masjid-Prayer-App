@@ -10,7 +10,7 @@ import 'settings_page.dart';
 /// Main Navigation Shell with Bottom Navigation Bar
 /// Contains 4 tabs: Prayer Times, Community Events, Questions, Settings
 class MainNavigationScreen extends StatefulWidget {
-  const MainNavigationScreen({Key? key}) : super(key: key);
+  const MainNavigationScreen({super.key});
 
   @override
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
@@ -45,11 +45,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.event),
-            label: appLocalization.t(AppStrings.community),
+            label: 'Events',
           ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.help_outline),
-            label: appLocalization.t(AppStrings.questions),
+            label: 'Community',
           ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.settings),

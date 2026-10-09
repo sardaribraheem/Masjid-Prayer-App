@@ -16,10 +16,10 @@ class QuestionRepository {
         .orderBy('timestamp', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs
-          .map((doc) => Question.fromJson(doc.data()))
-          .toList();
-    });
+          return snapshot.docs
+              .map((doc) => Question.fromJson({...doc.data(), 'id': doc.id}))
+              .toList();
+        });
   }
 
   /// Fetch questions once (for static display or admin panel)
@@ -32,7 +32,7 @@ class QuestionRepository {
           .orderBy('timestamp', descending: true)
           .get();
       return snapshot.docs
-          .map((doc) => Question.fromJson(doc.data()))
+          .map((doc) => Question.fromJson({...doc.data(), 'id': doc.id}))
           .toList();
     } catch (e) {
       debugPrint('Error fetching questions: $e');
@@ -43,11 +43,12 @@ class QuestionRepository {
   /// Add a new question to a masjid's subcollection
   Future<bool> addQuestion(Question question) async {
     try {
-      await _firestore
+      final doc = _firestore
           .collection('masjids')
           .doc(question.masjidId)
           .collection('questions')
-          .add(question.toJson());
+          .doc();
+      await doc.set({...question.toJson(), 'id': doc.id});
       return true;
     } catch (e) {
       debugPrint('Error adding question: $e');
@@ -67,10 +68,7 @@ class QuestionRepository {
           .doc(masjidId)
           .collection('questions')
           .doc(questionId)
-          .update({
-        'answer': answer,
-        'isAnswered': true,
-      });
+          .update({'answer': answer, 'isAnswered': true});
       return true;
     } catch (e) {
       debugPrint('Error answering question: $e');

@@ -9,11 +9,11 @@ class CategorySlider extends StatefulWidget {
   final List<CategoryItem> categories;
 
   const CategorySlider({
-    Key? key,
+    super.key,
     required this.selectedCategory,
     required this.onCategoryChanged,
     required this.categories,
-  }) : super(key: key);
+  });
 
   @override
   State<CategorySlider> createState() => _CategorySliderState();

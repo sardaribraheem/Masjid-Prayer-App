@@ -193,5 +193,4 @@ class FirebaseService {
       return false;
     }
   }
-
-  }
+}
