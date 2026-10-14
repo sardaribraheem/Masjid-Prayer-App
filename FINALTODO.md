@@ -139,6 +139,8 @@
 Prior completion claims are not release evidence. See MVP_REVIEW.md for source-confirmed blockers and pending verification.
 
 ## Launch implementation tracker
+
+The [app user and owner guide](app_guide.md), added 14 October, documents the current screens, registration/approval requirements, data locations and known deployment limits. This documentation does not mark pending workflows release verified.
 [launchplan.md](launchplan.md) tracks current phases and evidence. Phase 1 and the core Phase 2 code/rules pass local checks; production migration, client acceptance, and Android device QA remain open. Earlier checks do not certify the current build.
 
 ## 2026-10-14 reminders and deployed security audit

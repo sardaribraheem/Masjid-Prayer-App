@@ -2,6 +2,8 @@
 
 Flutter Android MVP for masjid communities, using Firebase Authentication, Firestore, Provider, and English/Urdu with RTL support. The app provides masjid selection, prayer times, approved events, text-only community posts and comments, member verification, and scoped imam management.
 
+Read [app_guide.md](app_guide.md) for installation/development commands, guest/member/imam workflows, mosque registration requirements, reminders, data storage and owner approval instructions.
+
 ## Launch status
 
 The current implementation has local Flutter, security-emulator, browser QA, and limited [Android device evidence](scripts/qa/ANDROID_DEVICE_QA.md). Broader device/signed-release acceptance and production migration remain pending. [launchplan.md](launchplan.md) records phase progress, and [MVP_REVIEW.md](MVP_REVIEW.md) retains the initial findings. See [UI QA](scripts/qa/UI_QA.md) for the latest checks and limits.
