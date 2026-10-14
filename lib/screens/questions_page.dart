@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/app_data.dart';
+import '../providers/masjid_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/question_provider.dart';
 import '../widgets/shared/empty_state.dart';
@@ -10,6 +11,7 @@ import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
 import 'muqtaddi_login_screen.dart';
 import '../widgets/post_comments.dart';
+import '../widgets/app_icon.dart';
 
 /// Questions Page - Users can ask questions and see answered questions
 ///
@@ -31,29 +33,29 @@ class _QuestionsPageState extends State<QuestionsPage> {
 
   StreamSubscription<List<Question>>? _questionSub;
 
+  String? _listeningMasjidId;
   @override
-  void initState() {
-    super.initState();
-    // Defer past the first frame: loadQuestions()/subscribeToQuestions() notify
-    // synchronously, which would otherwise trigger "setState() called during
-    // build". Subscribing here (not in build) also avoids creating a new
-    // Firestore listener on every rebuild.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _loadQuestions();
-      final masjidId = AppData.selectedMasjid?.id ?? '';
-      if (masjidId.isNotEmpty) {
-        _questionSub = context.read<QuestionProvider>().subscribeToQuestions(
-          masjidId,
-        );
-      }
-    });
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final id =
+        (context.watch<MasjidProvider>().selectedMasjid ??
+                AppData.selectedMasjid)
+            ?.id;
+    if (id != _listeningMasjidId) {
+      _listeningMasjidId = id;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && id == _listeningMasjidId) _loadQuestions();
+      });
+    }
   }
 
   Future<void> _loadQuestions() async {
     final masjidId = AppData.selectedMasjid?.id ?? '';
     if (masjidId.isNotEmpty) {
-      await context.read<QuestionProvider>().loadQuestions(masjidId);
+      _questionSub?.cancel();
+      _questionSub = context.read<QuestionProvider>().subscribeToQuestions(
+        masjidId,
+      );
     }
   }
 
@@ -146,35 +148,53 @@ class _QuestionsPageState extends State<QuestionsPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: appLocalization,
+    builder: (context, _) => _buildLocalized(context),
+  );
+
+  Widget _buildLocalized(BuildContext context) {
     final filteredQuestions = _getFilteredQuestions();
 
     return Scaffold(
       appBar: AppBar(
+        leading: Padding(
+          padding: const EdgeInsets.all(16),
+          child: AppIcon('book', color: Theme.of(context).colorScheme.primary),
+        ),
         title: Text(appLocalization.t(AppStrings.communityQA)),
-        backgroundColor: ColorPalette.primary,
         elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: appLocalization.t(AppStrings.refresh),
+            onPressed: _loadQuestions,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
       ),
-      body: Column(
+      body: ListView(
         children: [
           // Ask Question Card
           if (context.watch<AuthProvider>().isLoggedIn)
             Container(
               padding: const EdgeInsets.all(16),
-              color: ColorPalette.primary.withValues(alpha: 0.1),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.1),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    appLocalization.t(AppStrings.askTheImam),
+                    appLocalization.t(AppStrings.community),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: ColorPalette.primary,
+                      color: Theme.of(context).colorScheme.primary,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _questionController,
+                    enabled: !_isSubmitting,
                     maxLines: 3,
                     maxLength: 4000,
                     decoration: InputDecoration(
@@ -183,7 +203,7 @@ class _QuestionsPageState extends State<QuestionsPage> {
                         padding: const EdgeInsets.only(top: 8, left: 8),
                         child: Icon(
                           Icons.help_outline,
-                          color: ColorPalette.primary,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                       border: OutlineInputBorder(
@@ -196,15 +216,23 @@ class _QuestionsPageState extends State<QuestionsPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  CheckboxListTile(
-                    contentPadding: EdgeInsets.zero,
-                    controlAffinity: ListTileControlAffinity.leading,
-                    title: const Text('Post anonymously'),
-                    value: _isAnonymous,
-                    onChanged: (value) {
-                      if (value == null) return;
-                      setState(() => _isAnonymous = value);
-                    },
+                  Material(
+                    color: Colors.transparent,
+                    child: CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: Text(appLocalization.t('post_anonymously')),
+                      subtitle: Text(
+                        appLocalization.t('anonymous_display_note'),
+                      ),
+                      value: _isAnonymous,
+                      onChanged: _isSubmitting
+                          ? null
+                          : (value) {
+                              if (value == null) return;
+                              setState(() => _isAnonymous = value);
+                            },
+                    ),
                   ),
                   const SizedBox(height: 8),
                   SizedBox(
@@ -212,9 +240,15 @@ class _QuestionsPageState extends State<QuestionsPage> {
                     child: ElevatedButton.icon(
                       onPressed: _isSubmitting ? null : _submitQuestion,
                       icon: const Icon(Icons.send),
-                      label: Text(appLocalization.t(AppStrings.submitQuestion)),
+                      label: Text(
+                        appLocalization.t(
+                          _isSubmitting
+                              ? AppStrings.submitting
+                              : AppStrings.submitQuestion,
+                        ),
+                      ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: ColorPalette.primary,
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                   ),
@@ -226,14 +260,16 @@ class _QuestionsPageState extends State<QuestionsPage> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
-              color: ColorPalette.primary.withValues(alpha: 0.1),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.1),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    appLocalization.t(AppStrings.askTheImam),
+                    appLocalization.t(AppStrings.community),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: ColorPalette.primary,
+                      color: Theme.of(context).colorScheme.primary,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -258,7 +294,7 @@ class _QuestionsPageState extends State<QuestionsPage> {
                     icon: const Icon(Icons.login),
                     label: Text(appLocalization.t(AppStrings.login)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: ColorPalette.primary,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                     ),
                   ),
                 ],
@@ -268,58 +304,70 @@ class _QuestionsPageState extends State<QuestionsPage> {
           // Filter Tabs
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                _FilterButton(
-                  label: appLocalization.t(AppStrings.allCategories),
-                  isSelected: _filterType == 'all',
-                  onTap: () => setState(() => _filterType = 'all'),
-                ),
-                const SizedBox(width: 10),
-                _FilterButton(
-                  label: appLocalization.t(AppStrings.answered),
-                  isSelected: _filterType == 'answered',
-                  onTap: () => setState(() => _filterType = 'answered'),
-                ),
-                const SizedBox(width: 10),
-                _FilterButton(
-                  label: appLocalization.t(AppStrings.unanswered),
-                  isSelected: _filterType == 'unanswered',
-                  onTap: () => setState(() => _filterType = 'unanswered'),
-                ),
-              ],
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _FilterButton(
+                    label: appLocalization.t(AppStrings.allCategories),
+                    isSelected: _filterType == 'all',
+                    onTap: () => setState(() => _filterType = 'all'),
+                  ),
+                  const SizedBox(width: 10),
+                  _FilterButton(
+                    label: appLocalization.t(AppStrings.answered),
+                    isSelected: _filterType == 'answered',
+                    onTap: () => setState(() => _filterType = 'answered'),
+                  ),
+                  const SizedBox(width: 10),
+                  _FilterButton(
+                    label: appLocalization.t(AppStrings.unanswered),
+                    isSelected: _filterType == 'unanswered',
+                    onTap: () => setState(() => _filterType = 'unanswered'),
+                  ),
+                ],
+              ),
             ),
           ),
 
-          // Questions List
-          Expanded(
-            child: context.watch<QuestionProvider>().isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : filteredQuestions.isEmpty
-                ? EmptyState(
-                    icon: Icons.inbox_outlined,
-                    title: appLocalization.t(AppStrings.noQuestions),
-                    subtitle: appLocalization.t(
-                      AppStrings.questionsWillAppearHere,
-                    ),
-                    actionLabel: appLocalization.t(AppStrings.refresh),
-                    onAction: _loadQuestions,
-                  )
-                : RefreshIndicator(
-                    onRefresh: _loadQuestions,
-                    child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      itemCount: filteredQuestions.length,
-                      itemBuilder: (context, index) {
-                        final question = filteredQuestions[index];
-                        return _QuestionCard(question: question);
-                      },
-                    ),
-                  ),
-          ),
+          if (context.watch<QuestionProvider>().isLoading)
+            const Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (context.watch<QuestionProvider>().error != null)
+            EmptyState(
+              icon: Icons.cloud_off_outlined,
+              title: appLocalization.t('feed_error'),
+              actionLabel: appLocalization.t(AppStrings.refresh),
+              onAction: _loadQuestions,
+            )
+          else if (filteredQuestions.isEmpty)
+            EmptyState(
+              icon: Icons.chat_bubble_outline,
+              title: appLocalization.t(AppStrings.noQuestions),
+              subtitle: appLocalization.t(AppStrings.questionsWillAppearHere),
+            )
+          else
+            ...filteredQuestions.map(
+              (question) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _QuestionCard(
+                  key: ValueKey(question.id),
+                  question: question,
+                ),
+              ),
+            ),
+          if (context.watch<QuestionProvider>().hasMore)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: OutlinedButton(
+                onPressed: context.watch<QuestionProvider>().loadingMore
+                    ? null
+                    : context.read<QuestionProvider>().loadMore,
+                child: Text(appLocalization.t('load_more')),
+              ),
+            ),
         ],
       ),
     );
@@ -339,37 +387,49 @@ class _FilterButton extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? ColorPalette.primary : ColorPalette.lightBorder,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected
-                ? Theme.of(context).colorScheme.onPrimary
-                : Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.6),
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            fontSize: 12,
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => ChoiceChip(
+    label: Text(label),
+    selected: isSelected,
+    onSelected: (_) => onTap(),
+    visualDensity: VisualDensity.standard,
+  );
 }
 
 /// Question card widget
 class _QuestionCard extends StatelessWidget {
   final Question question;
 
-  const _QuestionCard({required this.question});
+  const _QuestionCard({super.key, required this.question});
+
+  Future<void> _delete(BuildContext context) async {
+    final provider = context.read<QuestionProvider>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(appLocalization.t('delete_post_confirm')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(appLocalization.t('cancel')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(appLocalization.t('delete_content')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final success = await provider.deleteQuestion(
+      question.masjidId,
+      question.id,
+    );
+    if (!success && context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(appLocalization.t('feed_error'))));
+    }
+  }
 
   String _formatTime(DateTime dateTime) {
     final now = DateTime.now();
@@ -390,6 +450,12 @@ class _QuestionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final canDelete =
+        auth.isLoggedIn &&
+        (auth.currentUser?.id == question.createdByUid ||
+            auth.currentUser?.canManageMasjid(question.masjidId) == true ||
+            auth.isSuperAdmin);
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 1,
@@ -440,13 +506,13 @@ class _QuestionCard extends StatelessWidget {
                   child: Text(
                     question.isAnswered
                         ? appLocalization.t(AppStrings.answered)
-                        : appLocalization.t(AppStrings.pending),
+                        : appLocalization.t('open_discussion'),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                       color: question.isAnswered
-                          ? ColorPalette.success
-                          : ColorPalette.warning,
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
@@ -490,6 +556,15 @@ class _QuestionCard extends StatelessWidget {
                 ),
               ),
             ],
+            if (canDelete)
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: IconButton(
+                  tooltip: appLocalization.t('delete_content'),
+                  onPressed: () => _delete(context),
+                  icon: const Icon(Icons.delete_outline),
+                ),
+              ),
             PostComments(masjidId: question.masjidId, postId: question.id),
           ],
         ),

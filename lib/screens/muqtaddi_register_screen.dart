@@ -5,7 +5,6 @@ import '../providers/auth_provider.dart';
 import '../l10n/app_localization.dart';
 import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
-import 'muqtaddi_login_screen.dart';
 
 /// Register screen for normal Muqtaddis (`latesttodo.md` §2).
 ///
@@ -37,6 +36,7 @@ class _MuqtaddiRegisterScreenState extends State<MuqtaddiRegisterScreen> {
   }
 
   Future<void> _handleRegister() async {
+    if (context.read<AuthProvider>().isLoading) return;
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
@@ -78,16 +78,15 @@ class _MuqtaddiRegisterScreenState extends State<MuqtaddiRegisterScreen> {
       );
       Navigator.of(context).pop(true);
     } else {
-      _showError(authProvider.error ?? appLocalization.t(AppStrings.registrationFailed));
+      _showError(
+        authProvider.error ?? appLocalization.t(AppStrings.registrationFailed),
+      );
     }
   }
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: ColorPalette.error,
-      ),
+      SnackBar(content: Text(message), backgroundColor: ColorPalette.error),
     );
   }
 
@@ -98,7 +97,6 @@ class _MuqtaddiRegisterScreenState extends State<MuqtaddiRegisterScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(appLocalization.t(AppStrings.muqtaddiRegisterTitle)),
-        backgroundColor: ColorPalette.primary,
         elevation: 0,
       ),
       body: SingleChildScrollView(
@@ -113,7 +111,7 @@ class _MuqtaddiRegisterScreenState extends State<MuqtaddiRegisterScreen> {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: ColorPalette.lightTextSecondary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 28),
@@ -121,6 +119,7 @@ class _MuqtaddiRegisterScreenState extends State<MuqtaddiRegisterScreen> {
             // Full name
             TextField(
               controller: _nameController,
+              maxLength: 100,
               enabled: !authProvider.isLoading,
               textInputAction: TextInputAction.next,
               decoration: InputDecoration(
@@ -139,9 +138,11 @@ class _MuqtaddiRegisterScreenState extends State<MuqtaddiRegisterScreen> {
               controller: _emailController,
               enabled: !authProvider.isLoading,
               keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.email],
+              autocorrect: false,
               textInputAction: TextInputAction.next,
               decoration: InputDecoration(
-                labelText: 'Email',
+                labelText: appLocalization.t('email_label'),
                 hintText: 'email@example.com',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -165,10 +166,11 @@ class _MuqtaddiRegisterScreenState extends State<MuqtaddiRegisterScreen> {
                 ),
                 prefixIcon: const Icon(Icons.lock_outline),
                 suffixIcon: IconButton(
+                  tooltip: appLocalization.t(
+                    _obscurePassword ? 'show_password' : 'hide_password',
+                  ),
                   icon: Icon(
-                    _obscurePassword
-                        ? Icons.visibility_off
-                        : Icons.visibility,
+                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
                   ),
                   onPressed: () =>
                       setState(() => _obscurePassword = !_obscurePassword),
@@ -191,10 +193,11 @@ class _MuqtaddiRegisterScreenState extends State<MuqtaddiRegisterScreen> {
                 ),
                 prefixIcon: const Icon(Icons.lock_outline),
                 suffixIcon: IconButton(
+                  tooltip: appLocalization.t(
+                    _obscureConfirm ? 'show_password' : 'hide_password',
+                  ),
                   icon: Icon(
-                    _obscureConfirm
-                        ? Icons.visibility_off
-                        : Icons.visibility,
+                    _obscureConfirm ? Icons.visibility_off : Icons.visibility,
                   ),
                   onPressed: () =>
                       setState(() => _obscureConfirm = !_obscureConfirm),
@@ -207,7 +210,6 @@ class _MuqtaddiRegisterScreenState extends State<MuqtaddiRegisterScreen> {
             ElevatedButton(
               onPressed: authProvider.isLoading ? null : _handleRegister,
               style: ElevatedButton.styleFrom(
-                backgroundColor: ColorPalette.primary,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 disabledBackgroundColor: ColorPalette.lightBorder,
               ),
@@ -231,8 +233,9 @@ class _MuqtaddiRegisterScreenState extends State<MuqtaddiRegisterScreen> {
             const SizedBox(height: 16),
 
             // Link to login
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              alignment: WrapAlignment.center,
               children: [
                 Text(
                   appLocalization.t(AppStrings.alreadyHaveAccount),
@@ -241,18 +244,12 @@ class _MuqtaddiRegisterScreenState extends State<MuqtaddiRegisterScreen> {
                 TextButton(
                   onPressed: authProvider.isLoading
                       ? null
-                      : () {
-                          Navigator.of(context).pushReplacement(
-                            MaterialPageRoute(
-                              builder: (_) => const MuqtaddiLoginScreen(),
-                            ),
-                          );
-                        },
+                      : () => Navigator.of(context).pop(false),
                   child: Text(
                     appLocalization.t(AppStrings.signInButton),
                     style: TextStyle(
                       fontSize: 14,
-                      color: ColorPalette.primary,
+                      color: Theme.of(context).colorScheme.primary,
                       fontWeight: FontWeight.bold,
                     ),
                   ),

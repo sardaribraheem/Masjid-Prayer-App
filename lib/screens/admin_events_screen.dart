@@ -35,8 +35,14 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
       await context.read<EventProvider>().loadEvents(
         masjidId,
         includePending: true,
+        statusFilter: _filter == 'all' ? null : _filter,
       );
     }
+  }
+
+  void _changeFilter(String value) {
+    setState(() => _filter = value);
+    _loadEvents();
   }
 
   @override
@@ -46,6 +52,9 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
         authProvider.currentUser?.canManageMasjid(AppData.selectedMasjid?.id) !=
             true) {
       return Scaffold(
+        appBar: AppBar(
+          title: Text(appLocalization.t(AppStrings.eventManagementTitle)),
+        ),
         body: Center(
           child: Text(appLocalization.t('manager_approval_required')),
         ),
@@ -54,16 +63,34 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
     final masjidId = AppData.selectedMasjid?.id ?? '';
 
     return Scaffold(
+      bottomNavigationBar: context.watch<EventProvider>().hasMore
+          ? SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: OutlinedButton(
+                  onPressed: context.watch<EventProvider>().loadingMore
+                      ? null
+                      : context.read<EventProvider>().loadMore,
+                  child: Text(appLocalization.t('load_more')),
+                ),
+              ),
+            )
+          : null,
       appBar: AppBar(
         title: Text(appLocalization.t(AppStrings.eventManagementTitle)),
-        backgroundColor: ColorPalette.primary,
-        elevation: 2,
+        actions: [
+          IconButton(
+            tooltip: appLocalization.t(AppStrings.refresh),
+            onPressed: _loadEvents,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
       ),
       floatingActionButton: masjidId.isEmpty
           ? null
           : FloatingActionButton.extended(
               onPressed: () => _showEventDialog(context),
-              backgroundColor: ColorPalette.primary,
+              backgroundColor: Theme.of(context).colorScheme.primary,
               foregroundColor: Theme.of(context).colorScheme.onPrimary,
               icon: const Icon(Icons.add),
               label: Text(appLocalization.t(AppStrings.createEvent)),
@@ -85,75 +112,47 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
       _ => allEvents,
     };
 
-    if (events.isEmpty) {
-      return Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Row(
-              children: [
-                _FilterChip(
-                  label: 'All',
-                  selected: _filter == 'all',
-                  onTap: () => setState(() => _filter = 'all'),
-                ),
-                const SizedBox(width: 8),
-                _FilterChip(
-                  label: 'Pending',
-                  selected: _filter == 'pending',
-                  onTap: () => setState(() => _filter = 'pending'),
-                ),
-                const SizedBox(width: 8),
-                _FilterChip(
-                  label: 'Approved',
-                  selected: _filter == 'approved',
-                  onTap: () => setState(() => _filter = 'approved'),
-                ),
-              ],
-            ),
-          ),
-          const Expanded(
-            child: EmptyState(
-              icon: Icons.event_outlined,
-              title: 'No events',
-              subtitle: 'Events will appear here',
-              actionLabel: 'Create event',
-              onAction: null,
-            ),
-          ),
-        ],
-      );
-    }
-
     return RefreshIndicator(
       onRefresh: _loadEvents,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
         children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Row(
-              children: [
-                _FilterChip(
-                  label: 'All',
-                  selected: _filter == 'all',
-                  onTap: () => setState(() => _filter = 'all'),
-                ),
-                const SizedBox(width: 8),
-                _FilterChip(
-                  label: 'Pending',
-                  selected: _filter == 'pending',
-                  onTap: () => setState(() => _filter = 'pending'),
-                ),
-                const SizedBox(width: 8),
-                _FilterChip(
-                  label: 'Approved',
-                  selected: _filter == 'approved',
-                  onTap: () => setState(() => _filter = 'approved'),
-                ),
-              ],
-            ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _FilterChip(
+                label: appLocalization.t('all_events'),
+                selected: _filter == 'all',
+                onTap: () => _changeFilter('all'),
+              ),
+              _FilterChip(
+                label: appLocalization.t('pending'),
+                selected: _filter == 'pending',
+                onTap: () => _changeFilter('pending'),
+              ),
+              _FilterChip(
+                label: appLocalization.t('approved'),
+                selected: _filter == 'approved',
+                onTap: () => _changeFilter('approved'),
+              ),
+            ],
           ),
+          const SizedBox(height: 16),
+          if (provider.error != null)
+            EmptyState(
+              icon: Icons.cloud_off_outlined,
+              title: appLocalization.t('feed_error'),
+              actionLabel: appLocalization.t(AppStrings.refresh),
+              onAction: _loadEvents,
+            )
+          else if (events.isEmpty)
+            EmptyState(
+              icon: Icons.event_outlined,
+              title: appLocalization.t(AppStrings.noEvents),
+              subtitle: appLocalization.t('events_empty_detail'),
+            ),
           ...events.map(
             (event) => _EventCard(
               event: event,
@@ -183,10 +182,12 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
     );
 
     if (!mounted || scaffoldMessenger == null) return;
+    await _loadEvents();
+    if (!mounted) return;
     scaffoldMessenger.showSnackBar(
       SnackBar(
         content: Text(
-          success ? 'Event status updated' : 'Could not update event status',
+          appLocalization.t(success ? 'changes_saved' : 'feed_error'),
         ),
         backgroundColor: success ? ColorPalette.success : ColorPalette.error,
       ),
@@ -237,57 +238,52 @@ class _AdminEventsScreenState extends State<AdminEventsScreen> {
     );
   }
 
-  /// Show dialog to add or edit an event
+  /// The dialog submits before closing, keeping drafts when a write fails.
   Future<void> _showEventDialog(BuildContext context, {Event? existing}) async {
-    final prov = Provider.of<EventProvider>(context, listen: false);
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final masjidId = AppData.selectedMasjid?.id ?? '';
-    final masjidName = AppData.selectedMasjid?.name ?? '';
-
+    final provider = context.read<EventProvider>();
+    final auth = context.read<AuthProvider>();
+    final masjid = AppData.selectedMasjid;
+    final user = auth.currentUser;
+    if (masjid == null || user == null) return;
     final result = await showDialog<Event>(
       context: context,
-      builder: (_) => _EventFormDialog(existing: existing),
-    );
-
-    if (result == null || !mounted || !context.mounted) return;
-
-    final eventToSave = Event(
-      id: existing?.id ?? '',
-      title: result.title,
-      description: result.description,
-      masjidId: masjidId,
-      masjidName: masjidName,
-      eventDate: result.eventDate,
-      startTime: result.startTime,
-      endTime: result.endTime,
-      location: result.location,
-      category: result.category,
-      mediaUrl: result.mediaUrl,
-      mediaType: result.mediaType,
-      status: existing?.status ?? EventStatus.approved,
-      createdByUid: existing != null
-          ? existing.createdByUid
-          : context.read<AuthProvider>().currentUser?.id,
-      createdByName: existing != null
-          ? existing.createdByName
-          : context.read<AuthProvider>().currentUser?.username,
-    );
-
-    final success = existing == null
-        ? await prov.addEvent(eventToSave)
-        : await prov.updateEvent(masjidId, eventToSave);
-
-    if (!mounted) return;
-    scaffoldMessenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          success
-              ? appLocalization.t(AppStrings.changesSaved)
-              : appLocalization.t(AppStrings.errorOccurredMsg),
-        ),
-        backgroundColor: success ? ColorPalette.success : ColorPalette.error,
+      barrierDismissible: false,
+      builder: (_) => _EventFormDialog(
+        existing: existing,
+        onSubmit: (draft) async {
+          if (auth.currentUser?.id != user.id) return false;
+          final event = Event(
+            id: existing?.id ?? '',
+            title: draft.title,
+            description: draft.description,
+            masjidId: masjid.id,
+            masjidName: masjid.name,
+            eventDate: draft.eventDate,
+            startTime: draft.startTime,
+            endTime: draft.endTime,
+            location: draft.location,
+            category: draft.category,
+            mediaUrl: draft.mediaUrl,
+            mediaType: draft.mediaType,
+            status: existing?.status ?? EventStatus.approved,
+            createdByUid: existing != null ? existing.createdByUid : user.id,
+            createdByName: existing != null
+                ? existing.createdByName
+                : user.username,
+          );
+          return existing == null
+              ? provider.addEvent(event)
+              : provider.updateEvent(masjid.id, event);
+        },
       ),
     );
+    if (result != null && context.mounted) {
+      await _loadEvents();
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(appLocalization.t(AppStrings.changesSaved))),
+      );
+    }
   }
 }
 
@@ -336,7 +332,9 @@ class _EventCard extends StatelessWidget {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: ColorPalette.primary.withValues(alpha: 0.12),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
@@ -344,27 +342,30 @@ class _EventCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: ColorPalette.primary,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                   ),
               ],
             ),
             const SizedBox(height: 8),
-            Row(
+            Wrap(
+              spacing: 12,
+              runSpacing: 6,
               children: [
-                const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
-                const SizedBox(width: 6),
                 Text(
                   _formatDate(event.eventDate),
-                  style: const TextStyle(fontSize: 13, color: Colors.grey),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
-                const SizedBox(width: 12),
-                const Icon(Icons.access_time, size: 14, color: Colors.grey),
-                const SizedBox(width: 6),
                 Text(
-                  '${event.startTime} - ${event.endTime}',
-                  style: const TextStyle(fontSize: 13, color: Colors.grey),
+                  '${event.startTime} – ${event.endTime}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -399,9 +400,9 @@ class _EventCard extends StatelessWidget {
                     child: ElevatedButton.icon(
                       onPressed: onApproveTap,
                       icon: const Icon(Icons.check, size: 18),
-                      label: const Text('Approve'),
+                      label: Text(appLocalization.t('approve')),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: ColorPalette.success,
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                   ),
@@ -410,7 +411,7 @@ class _EventCard extends StatelessWidget {
                     child: OutlinedButton.icon(
                       onPressed: onRejectTap,
                       icon: const Icon(Icons.close, size: 18),
-                      label: const Text('Reject'),
+                      label: Text(appLocalization.t('reject')),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: ColorPalette.error,
                         side: BorderSide(color: ColorPalette.error),
@@ -429,8 +430,10 @@ class _EventCard extends StatelessWidget {
                     icon: const Icon(Icons.edit, size: 18),
                     label: Text(appLocalization.t(AppStrings.edit)),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: ColorPalette.primary,
-                      side: BorderSide(color: ColorPalette.primary),
+                      foregroundColor: Theme.of(context).colorScheme.primary,
+                      side: BorderSide(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                     ),
                   ),
                 ),
@@ -486,32 +489,10 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected
-              ? ColorPalette.primary
-              : Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected
-                ? ColorPalette.primary
-                : Theme.of(context).colorScheme.outline,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected
-                ? Theme.of(context).colorScheme.onPrimary
-                : Theme.of(context).colorScheme.onSurface,
-            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-            fontSize: 12,
-          ),
-        ),
-      ),
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onTap(),
     );
   }
 }
@@ -520,7 +501,8 @@ class _FilterChip extends StatelessWidget {
 class _EventFormDialog extends StatefulWidget {
   final Event? existing;
 
-  const _EventFormDialog({this.existing});
+  final Future<bool> Function(Event)? onSubmit;
+  const _EventFormDialog({this.existing, this.onSubmit});
 
   @override
   State<_EventFormDialog> createState() => _EventFormDialogState();
@@ -531,14 +513,14 @@ class _EventFormDialogState extends State<_EventFormDialog> {
   late final TextEditingController _descriptionController;
   late final TextEditingController _locationController;
   late final TextEditingController _categoryController;
-  late final TextEditingController _mediaUrlController;
   late DateTime _eventDate;
   late TimeOfDay _startTime;
   late TimeOfDay _endTime;
-  String _mediaType = 'image';
   final _formKey = GlobalKey<FormState>();
 
-  static const _categories = ['Class', 'Talk', 'Gathering', 'Lecture'];
+  static const _categories = ['Taleem', 'Dars', 'Jammat', 'Gasht', 'Other'];
+  bool _saving = false;
+  String? _error;
 
   @override
   void initState() {
@@ -549,11 +531,11 @@ class _EventFormDialogState extends State<_EventFormDialog> {
       text: existing?.description ?? '',
     );
     _locationController = TextEditingController(text: existing?.location ?? '');
-    _categoryController = TextEditingController(text: existing?.category ?? '');
-    _mediaUrlController = TextEditingController(text: existing?.mediaUrl ?? '');
-    _mediaType =
-        existing?.mediaType ??
-        (existing?.isImageMedia == true ? 'image' : 'video');
+    _categoryController = TextEditingController(
+      text: _categories.contains(existing?.category)
+          ? existing!.category
+          : 'Other',
+    );
     _eventDate = existing?.eventDate ?? DateTime.now();
     _startTime =
         _parseTime(existing?.startTime) ?? const TimeOfDay(hour: 10, minute: 0);
@@ -591,7 +573,6 @@ class _EventFormDialogState extends State<_EventFormDialog> {
     _descriptionController.dispose();
     _locationController.dispose();
     _categoryController.dispose();
-    _mediaUrlController.dispose();
     super.dispose();
   }
 
@@ -623,10 +604,10 @@ class _EventFormDialogState extends State<_EventFormDialog> {
     }
   }
 
-  void _save() {
+  Future<void> _save() async {
+    if (_saving) return;
     if (!_formKey.currentState!.validate()) return;
 
-    final mediaUrl = _mediaUrlController.text.trim();
     final result = Event(
       id: widget.existing?.id ?? '',
       title: _titleController.text.trim(),
@@ -642,175 +623,209 @@ class _EventFormDialogState extends State<_EventFormDialog> {
       category: _categoryController.text.trim().isEmpty
           ? null
           : _categoryController.text.trim(),
-      mediaUrl: mediaUrl.isEmpty ? null : mediaUrl,
-      mediaType: mediaUrl.isEmpty ? null : _mediaType,
+      mediaUrl: widget.existing?.mediaUrl,
+      mediaType: widget.existing?.mediaType,
     );
-    Navigator.pop(context, result);
+    if (_endTime.hour * 60 + _endTime.minute <=
+        _startTime.hour * 60 + _startTime.minute) {
+      setState(() => _error = appLocalization.t('event_time_invalid'));
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final success = widget.onSubmit == null || await widget.onSubmit!(result);
+      if (!mounted) return;
+      if (success) {
+        Navigator.pop(context, result);
+      } else {
+        setState(() => _error = appLocalization.t('feed_error'));
+      }
+    } catch (_) {
+      if (mounted) setState(() => _error = appLocalization.t('feed_error'));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.existing != null;
 
-    return AlertDialog(
-      title: Text(
-        isEdit
-            ? appLocalization.t(AppStrings.editEvent)
-            : appLocalization.t(AppStrings.createEvent),
-      ),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: SingleChildScrollView(
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextFormField(
-                  controller: _titleController,
-                  decoration: InputDecoration(
-                    labelText: appLocalization.t(AppStrings.eventTitle),
-                    border: const OutlineInputBorder(),
-                  ),
-                  validator: (v) =>
-                      v == null || v.trim().isEmpty ? 'Required' : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _descriptionController,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    labelText: appLocalization.t(AppStrings.eventDescription),
-                    border: const OutlineInputBorder(),
-                  ),
-                  validator: (v) =>
-                      v == null || v.trim().isEmpty ? 'Required' : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _mediaUrlController,
-                  decoration: InputDecoration(
-                    labelText: 'Optional media link',
-                    border: const OutlineInputBorder(),
-                    hintText: 'https://example.com/poster.jpg',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Text('Media type: '),
-                    const SizedBox(width: 8),
-                    DropdownButton<String>(
-                      value: _mediaType,
-                      items: const [
-                        DropdownMenuItem(value: 'image', child: Text('Image')),
-                        DropdownMenuItem(value: 'video', child: Text('Video')),
-                      ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() => _mediaType = value);
-                        }
-                      },
+    return PopScope(
+      canPop: !_saving,
+      child: AlertDialog(
+        title: Text(
+          isEdit
+              ? appLocalization.t(AppStrings.editEvent)
+              : appLocalization.t(AppStrings.createEvent),
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextFormField(
+                    controller: _titleController,
+                    enabled: !_saving,
+                    maxLength: 200,
+                    decoration: InputDecoration(
+                      labelText: appLocalization.t(AppStrings.eventTitle),
+                      border: const OutlineInputBorder(),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                // Date picker
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '${appLocalization.t(AppStrings.eventDate)}: ${_eventDate.month}/${_eventDate.day}/${_eventDate.year}',
-                        style: const TextStyle(fontSize: 14),
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? appLocalization.t(AppStrings.fieldRequired)
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _descriptionController,
+                    enabled: !_saving,
+                    maxLength: 4000,
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      labelText: appLocalization.t(AppStrings.eventDescription),
+                      border: const OutlineInputBorder(),
+                    ),
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? appLocalization.t(AppStrings.fieldRequired)
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  // Date picker
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${appLocalization.t(AppStrings.eventDate)}: ${_eventDate.month}/${_eventDate.day}/${_eventDate.year}',
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: _saving ? null : _pickDate,
+                        icon: const Icon(Icons.calendar_today, size: 16),
+                        label: Text(appLocalization.t(AppStrings.pick)),
+                      ),
+                    ],
+                  ),
+                  // Time pickers
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${appLocalization.t(AppStrings.start)}: ${_formatTime(_startTime)}',
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: _saving
+                            ? null
+                            : () => _pickTime(isStart: true),
+                        icon: const Icon(Icons.access_time, size: 16),
+                        label: Text(appLocalization.t(AppStrings.pick)),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${appLocalization.t(AppStrings.end)}: ${_formatTime(_endTime)}',
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: _saving
+                            ? null
+                            : () => _pickTime(isStart: false),
+                        icon: const Icon(Icons.access_time, size: 16),
+                        label: Text(appLocalization.t(AppStrings.pick)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _locationController,
+                    enabled: !_saving,
+                    maxLength: 500,
+                    decoration: InputDecoration(
+                      labelText: appLocalization.t(AppStrings.eventLocation),
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: _categories.contains(_categoryController.text)
+                        ? _categoryController.text
+                        : null,
+                    decoration: InputDecoration(
+                      labelText: appLocalization.t(AppStrings.eventCategory),
+                      border: const OutlineInputBorder(),
+                    ),
+                    items: _categories
+                        .map(
+                          (c) => DropdownMenuItem(
+                            value: c,
+                            child: Text(appLocalization.t(c.toLowerCase())),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: _saving
+                        ? null
+                        : (value) {
+                            _categoryController.text = value ?? '';
+                          },
+                  ),
+                  if (_error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: Semantics(
+                        liveRegion: true,
+                        child: Text(
+                          _error!,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
                       ),
                     ),
-                    TextButton.icon(
-                      onPressed: _pickDate,
-                      icon: const Icon(Icons.calendar_today, size: 16),
-                      label: Text(appLocalization.t(AppStrings.pick)),
-                    ),
-                  ],
-                ),
-                // Time pickers
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '${appLocalization.t(AppStrings.start)}: ${_formatTime(_startTime)}',
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: () => _pickTime(isStart: true),
-                      icon: const Icon(Icons.access_time, size: 16),
-                      label: Text(appLocalization.t(AppStrings.pick)),
-                    ),
-                  ],
-                ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '${appLocalization.t(AppStrings.end)}: ${_formatTime(_endTime)}',
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: () => _pickTime(isStart: false),
-                      icon: const Icon(Icons.access_time, size: 16),
-                      label: Text(appLocalization.t(AppStrings.pick)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: _locationController,
-                  decoration: InputDecoration(
-                    labelText: appLocalization.t(AppStrings.eventLocation),
-                    border: const OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: _categories.contains(_categoryController.text)
-                      ? _categoryController.text
-                      : null,
-                  decoration: InputDecoration(
-                    labelText: appLocalization.t(AppStrings.eventCategory),
-                    border: const OutlineInputBorder(),
-                  ),
-                  items: _categories
-                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                      .toList(),
-                  onChanged: (value) {
-                    _categoryController.text = value ?? '';
-                  },
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(appLocalization.t(AppStrings.cancel)),
-        ),
-        ElevatedButton(
-          onPressed: _save,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: ColorPalette.primary,
+        actions: [
+          TextButton(
+            onPressed: _saving ? null : () => Navigator.pop(context),
+            child: Text(appLocalization.t(AppStrings.cancel)),
           ),
-          child: Text(appLocalization.t(AppStrings.save)),
-        ),
-      ],
+          ElevatedButton(
+            onPressed: _saving ? null : _save,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+            ),
+            child: Text(
+              appLocalization.t(_saving ? 'submitting' : AppStrings.save),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 /// Shared form used by the verified member's proposal action.
-Future<Event?> showEventProposalForm(BuildContext context) => showDialog<Event>(
+Future<Event?> showEventProposalForm(
+  BuildContext context, {
+  required Future<bool> Function(Event) onSubmit,
+}) => showDialog<Event>(
   context: context,
-  builder: (_) => const _EventFormDialog(),
+  barrierDismissible: false,
+  builder: (_) => _EventFormDialog(onSubmit: onSubmit),
 );

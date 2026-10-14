@@ -1,3 +1,4 @@
+import '../widgets/password_reset_button.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
@@ -152,7 +153,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(appLocalization.t(AppStrings.adminLogin)),
-        backgroundColor: ColorPalette.tertiary,
         elevation: 0,
       ),
       body: Padding(
@@ -173,7 +173,10 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
               const SizedBox(height: 8),
               Text(
                 'Sign in with your email and password',
-                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 30),
 
@@ -182,8 +185,10 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                 controller: emailController,
                 enabled: !isLoading,
                 keyboardType: TextInputType.emailAddress,
+                autofillHints: const [AutofillHints.email],
+                autocorrect: false,
                 decoration: InputDecoration(
-                  labelText: 'Email',
+                  labelText: appLocalization.t('email_label'),
                   hintText: 'admin@masjid.com',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -235,7 +240,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                 child: ElevatedButton(
                   onPressed: isLoading ? null : handleLogin,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: ColorPalette.tertiary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     disabledBackgroundColor: ColorPalette.lightBorder,
                   ),
@@ -261,68 +265,73 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Google Sign-In button
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: isLoading
-                      ? null
-                      : () async {
-                          final authProvider = context.read<AuthProvider>();
-                          final scaffoldMessenger = ScaffoldMessenger.of(
-                            context,
-                          );
-                          final navigator = Navigator.of(context);
-                          final success = await authProvider.signInWithGoogle();
-                          if (!mounted) return;
-                          if (success) {
-                            final user = authProvider.currentUser;
-                            if (user == null ||
-                                !user.isAdminOrImam ||
-                                user.masjidId == null) {
-                              scaffoldMessenger.showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    appLocalization.t(
-                                      'manager_approval_required',
+              PasswordResetButton(
+                emailController: emailController,
+                disabled: isLoading,
+              ),
+              // Enable only after provider setup and device verification.
+              if (const bool.fromEnvironment('ENABLE_GOOGLE_SIGN_IN'))
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: isLoading
+                        ? null
+                        : () async {
+                            final authProvider = context.read<AuthProvider>();
+                            final scaffoldMessenger = ScaffoldMessenger.of(
+                              context,
+                            );
+                            final navigator = Navigator.of(context);
+                            final success = await authProvider
+                                .signInWithGoogle();
+                            if (!mounted) return;
+                            if (success) {
+                              final user = authProvider.currentUser;
+                              if (user == null ||
+                                  !user.isAdminOrImam ||
+                                  user.masjidId == null) {
+                                scaffoldMessenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      appLocalization.t(
+                                        'manager_approval_required',
+                                      ),
                                     ),
                                   ),
+                                );
+                                return;
+                              }
+                              final masjid = await _firebaseService
+                                  .getMasjidById(user.masjidId!);
+                              if (!mounted || masjid == null) return;
+                              AppData.selectedMasjid = masjid;
+                              AppData.selectedMasjidId = masjid.id;
+                              navigator.push(
+                                MaterialPageRoute(
+                                  builder: (_) => const AdminPanelScreen(),
                                 ),
                               );
-                              return;
+                            } else if (authProvider.error != null) {
+                              scaffoldMessenger.showSnackBar(
+                                SnackBar(
+                                  content: Text(authProvider.error!),
+                                  backgroundColor: ColorPalette.error,
+                                ),
+                              );
                             }
-                            final masjid = await _firebaseService.getMasjidById(
-                              user.masjidId!,
-                            );
-                            if (!mounted || masjid == null) return;
-                            AppData.selectedMasjid = masjid;
-                            AppData.selectedMasjidId = masjid.id;
-                            navigator.push(
-                              MaterialPageRoute(
-                                builder: (_) => const AdminPanelScreen(),
-                              ),
-                            );
-                          } else if (authProvider.error != null) {
-                            scaffoldMessenger.showSnackBar(
-                              SnackBar(
-                                content: Text(authProvider.error!),
-                                backgroundColor: ColorPalette.error,
-                              ),
-                            );
-                          }
-                        },
-                  icon: const Icon(Icons.login, color: Colors.black54),
-                  label: const Text('Sign in with Google'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.black87,
-                    side: const BorderSide(color: Colors.grey),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                          },
+                    icon: const Icon(Icons.login, color: Colors.black54),
+                    label: const Text('Sign in with Google'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.black87,
+                      side: const BorderSide(color: Colors.grey),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
                 ),
-              ),
               const SizedBox(height: 16),
 
               // Register Masjid button
@@ -339,7 +348,10 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                       },
                 child: Text(
                   appLocalization.t(AppStrings.registerNewMasjid),
-                  style: TextStyle(fontSize: 14, color: ColorPalette.primary),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
                 ),
               ),
             ],

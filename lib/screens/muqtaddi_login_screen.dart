@@ -1,3 +1,4 @@
+import '../widgets/password_reset_button.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -31,6 +32,7 @@ class _MuqtaddiLoginScreenState extends State<MuqtaddiLoginScreen> {
   }
 
   Future<void> _handleLogin() async {
+    if (context.read<AuthProvider>().isLoading) return;
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
@@ -47,17 +49,15 @@ class _MuqtaddiLoginScreenState extends State<MuqtaddiLoginScreen> {
       Navigator.of(context).pop(true);
     } else {
       _showError(
-        authProvider.error ?? appLocalization.t(AppStrings.invalidUsernameOrPassword),
+        authProvider.error ??
+            appLocalization.t(AppStrings.invalidUsernameOrPassword),
       );
     }
   }
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: ColorPalette.error,
-      ),
+      SnackBar(content: Text(message), backgroundColor: ColorPalette.error),
     );
   }
 
@@ -68,7 +68,6 @@ class _MuqtaddiLoginScreenState extends State<MuqtaddiLoginScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(appLocalization.t(AppStrings.muqtaddiLoginTitle)),
-        backgroundColor: ColorPalette.primary,
         elevation: 0,
       ),
       body: SingleChildScrollView(
@@ -83,7 +82,7 @@ class _MuqtaddiLoginScreenState extends State<MuqtaddiLoginScreen> {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: ColorPalette.lightTextSecondary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 28),
@@ -93,9 +92,11 @@ class _MuqtaddiLoginScreenState extends State<MuqtaddiLoginScreen> {
               controller: _emailController,
               enabled: !authProvider.isLoading,
               keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.email],
+              autocorrect: false,
               textInputAction: TextInputAction.next,
               decoration: InputDecoration(
-                labelText: 'Email',
+                labelText: appLocalization.t('email_label'),
                 hintText: 'email@example.com',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -120,6 +121,9 @@ class _MuqtaddiLoginScreenState extends State<MuqtaddiLoginScreen> {
                 ),
                 prefixIcon: const Icon(Icons.lock_outline),
                 suffixIcon: IconButton(
+                  tooltip: appLocalization.t(
+                    _obscurePassword ? 'show_password' : 'hide_password',
+                  ),
                   icon: Icon(
                     _obscurePassword ? Icons.visibility_off : Icons.visibility,
                   ),
@@ -134,7 +138,6 @@ class _MuqtaddiLoginScreenState extends State<MuqtaddiLoginScreen> {
             ElevatedButton(
               onPressed: authProvider.isLoading ? null : _handleLogin,
               style: ElevatedButton.styleFrom(
-                backgroundColor: ColorPalette.primary,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 disabledBackgroundColor: ColorPalette.lightBorder,
               ),
@@ -144,8 +147,7 @@ class _MuqtaddiLoginScreenState extends State<MuqtaddiLoginScreen> {
                       width: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(Colors.white),
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     )
                   : Text(
@@ -158,9 +160,14 @@ class _MuqtaddiLoginScreenState extends State<MuqtaddiLoginScreen> {
             ),
             const SizedBox(height: 16),
 
+            PasswordResetButton(
+              emailController: _emailController,
+              disabled: authProvider.isLoading,
+            ),
             // Link to register
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              alignment: WrapAlignment.center,
               children: [
                 Text(
                   appLocalization.t(AppStrings.dontHaveAccount),
@@ -169,19 +176,23 @@ class _MuqtaddiLoginScreenState extends State<MuqtaddiLoginScreen> {
                 TextButton(
                   onPressed: authProvider.isLoading
                       ? null
-                      : () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  const MuqtaddiRegisterScreen(),
-                            ),
-                          );
+                      : () async {
+                          final registered = await Navigator.of(context)
+                              .push<bool>(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const MuqtaddiRegisterScreen(),
+                                ),
+                              );
+                          if (registered == true && context.mounted) {
+                            Navigator.of(context).pop(true);
+                          }
                         },
                   child: Text(
                     appLocalization.t(AppStrings.createAccount),
                     style: TextStyle(
                       fontSize: 14,
-                      color: ColorPalette.primary,
+                      color: Theme.of(context).colorScheme.primary,
                       fontWeight: FontWeight.bold,
                     ),
                   ),

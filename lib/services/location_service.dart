@@ -22,8 +22,7 @@ class LocationService {
         return result == LocationPermission.whileInUse ||
             result == LocationPermission.always;
       } else if (permission == LocationPermission.deniedForever) {
-        // User has permanently denied permission, open app settings
-        await Geolocator.openLocationSettings();
+        // The user can continue by searching without location.
         return false;
       }
 
@@ -56,6 +55,7 @@ class LocationService {
       // Get current position
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 12),
       );
 
       return position;
@@ -76,5 +76,4 @@ class LocationService {
       return false;
     }
   }
-
 }

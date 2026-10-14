@@ -56,7 +56,7 @@
 ## SESSION 2 — PRAYER, EVENTS, COMMUNITY, QUESTIONS
 
 ### 12. Namaz Notifications
-- [ ] Scheduler is absent. Notifications are deferred from this MVP; remove the saved-only toggle and promises in Phase 3.
+- [ ] Scheduler is absent. Notifications are deferred from this MVP; the saved-only toggle and scheduling promises were removed.
 
 ### 13. Prayer Page
 - [x] Normal user view with prayer times, sunrise, sunset, countdown ("X hours remaining"), and localized prayer names
@@ -87,10 +87,10 @@
 - [~] Community posts are text-only; media inputs and previews removed from both posting screens. Existing attachments are not deleted from production.
 
 ### 22. Question Posting & Comments
-- [~] Text posts (up to 4,000 characters) and comments (up to 1,000 characters) implemented. Comments load on demand, newest 30 first. Firestore rule deployment and runtime verification remain pending.
+- [~] Text posts (up to 4,000 characters) and comments (up to 1,000 characters) implemented. Comments load on demand, newest 30 first with older pagination and delete controls. Local emulator/Playwright persistence is verified; production rule deployment and Android acceptance remain pending.
 
 ### 23. Community Permissions
-- [~] Post author UID and text-only schema validated by local rules. Comment authors and server timestamps validated. Rules need emulator tests and deployment; broader role security has launch blockers (MVP_REVIEW.md).
+- [~] Post author UID and text-only schema validated by local rules. Comment authors and server timestamps validated. 31 local rule tests pass, including role denial, text limits, and deletion races. Production migration/deployment and device acceptance remain launch gates (launchplan.md).
 
 ### 24. Imam Question Management
 - [~] Imam/admin question management is supported through the live Q&A flow and answer storage in Firestore.
@@ -112,7 +112,7 @@
 - [x] Help & Support opens `mailto:sardaribraheem277@gmail.com` via mail client intent
 
 ### 29. Privacy Policy
-- [~] Create Privacy Policy page detailing data collection, verification, community posts, event registration, and deletion
+- [~] English/Urdu privacy describes actual account data, public text/approved events, optional location, retention, and retryable deletion. Attendance registration is explicitly absent; release review remains pending.
 
 ### 30. Delete Account
 - [~] Real Firebase Auth account deletion flow with proper data cleanup and logout
@@ -121,7 +121,7 @@
 - [~] Prevent keyboard from corrupting layouts, covering fields, or pushing buttons off-screen across all key forms
 
 ### 32. Streamline Icons
-- [x] Integrate Streamline icons for prayer, sunrise, sunset, events, Jammat, Taleem, Quran, Hadith, questions, verification, settings, and admin controls
+- [~] Six bundled Streamline Nova icons cover navigation, community header, and prayer/sun rows. Material icons remain for categories and management; do not claim every control uses Streamline.
 
 ### 33. Fake / Sample Data
 - [x] Remove production reliance on `FirebaseService.initializeSampleData()`
@@ -140,3 +140,10 @@ Prior completion claims are not release evidence. See MVP_REVIEW.md for source-c
 
 ## Launch implementation tracker
 [launchplan.md](launchplan.md) tracks current phases and evidence. Phase 1 and the core Phase 2 code/rules pass local checks; production migration, client acceptance, and Android device QA remain open. Earlier checks do not certify the current build.
+
+
+## 2026-10-14 UI and launch-readiness pass
+
+Shared Material theme, bundled Poppins/Streamline assets, optional location, prayer countdown edge cases, bounded feeds/comments, post cleanup, canonical event categories, real Upcoming/All filtering, refreshed settings/privacy, and login password recovery are implemented. See [UI_QA.md](scripts/qa/UI_QA.md) for browser and emulator evidence.
+
+Analysis, 10 Flutter tests, and 31 rule tests pass; an ARM64 debug APK builds. 29 repeatable Playwright assertions verify local demo flows, including denied-save recovery and full account cleanup, not production. No Android device was available; actual keyboard behavior, signed release configuration, staging/production migration, deployed indexes/rules, and failure/restart acceptance remain open. Broad checklist items remain in progress until that evidence exists.

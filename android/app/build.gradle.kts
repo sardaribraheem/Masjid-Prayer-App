@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -5,6 +7,12 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
     // Add the Google services Gradle plugin
     id("com.google.gms.google-services")
+}
+
+val releaseProperties = Properties()
+val releasePropertiesFile = rootProject.file("key.properties")
+if (releasePropertiesFile.exists()) {
+    releasePropertiesFile.inputStream().use { releaseProperties.load(it) }
 }
 
 android {
@@ -32,13 +40,22 @@ android {
         versionName = flutter.versionName
     }
 
-    buildTypes {
-        release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+    signingConfigs {
+        create("release") {
+            if (releasePropertiesFile.exists()) {
+                keyAlias = releaseProperties.getProperty("keyAlias")
+                keyPassword = releaseProperties.getProperty("keyPassword")
+                storeFile = releaseProperties.getProperty("storeFile")?.let { file(it) }
+                storePassword = releaseProperties.getProperty("storePassword")
+            }
         }
     }
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.getByName("release")
+        }
+    }
+
 }
 dependencies {
     // Import the Firebase BoM
@@ -47,8 +64,18 @@ dependencies {
     // Add Firebase dependencies (without version numbers when using BoM)
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-firestore")
-    implementation("com.google.firebase:firebase-analytics")
 }
 flutter {
     source = "../.."
+}
+
+// A production artifact must never silently use the debug key.
+tasks.configureEach {
+    if (name.contains("Release", ignoreCase = true)) {
+        doFirst {
+            if (!releasePropertiesFile.exists()) {
+                throw GradleException("Release signing is missing. Configure android/key.properties; see scripts/qa/ANDROID_RELEASE.md.")
+            }
+        }
+    }
 }

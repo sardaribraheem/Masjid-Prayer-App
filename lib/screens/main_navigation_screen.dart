@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localization.dart';
 import '../l10n/app_strings.dart';
-import '../theme/app_theme.dart';
+import '../widgets/app_icon.dart';
 import 'community_page.dart';
 import 'prayer_page.dart';
 import 'questions_page.dart';
@@ -34,35 +34,35 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: appLocalization,
+    builder: (context, _) => _buildLocalized(context),
+  );
+
+  Widget _buildLocalized(BuildContext context) {
     return Scaffold(
       body: _pages[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        items: [
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.schedule),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: _onItemTapped,
+        destinations: [
+          NavigationDestination(
+            icon: const AppIcon('prayer'),
             label: appLocalization.t(AppStrings.time),
           ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.event),
-            label: 'Events',
+          NavigationDestination(
+            icon: const AppIcon('events'),
+            label: appLocalization.t('events_nav'),
           ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.help_outline),
-            label: 'Community',
+          NavigationDestination(
+            icon: const AppIcon('community'),
+            label: appLocalization.t(AppStrings.community),
           ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.settings),
+          NavigationDestination(
+            icon: const AppIcon('settings'),
             label: appLocalization.t(AppStrings.settings),
           ),
         ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: ColorPalette.primary,
-        unselectedItemColor: ColorPalette.lightTextSecondary,
-        backgroundColor: ColorPalette.lightCardBg,
-        type: BottomNavigationBarType.fixed,
-        elevation: 8,
-        onTap: _onItemTapped,
       ),
     );
   }

@@ -57,6 +57,7 @@ class _MemberVerificationScreenState extends State<MemberVerificationScreen> {
     if (!auth.isSuperAdmin &&
         auth.currentUser?.canManageMasjid(widget.masjidId) != true) {
       return Scaffold(
+        appBar: AppBar(title: Text(appLocalization.t('review_members'))),
         body: Center(
           child: Text(appLocalization.t('manager_approval_required')),
         ),

@@ -13,6 +13,15 @@ class EventProvider extends ChangeNotifier {
   List<Event> _events = [];
   bool _isLoading = false;
   String? _error;
+  int _generation = 0;
+  String? _masjidId;
+  bool _hasMore = false;
+  bool _loadingMore = false;
+  bool get hasMore => _hasMore;
+  bool get loadingMore => _loadingMore;
+  bool _includePending = false;
+  bool _upcomingOnly = false;
+  String? _statusFilter;
 
   List<Event> get events => _events;
   bool get isLoading => _isLoading;
@@ -41,17 +50,33 @@ class EventProvider extends ChangeNotifier {
   Future<void> loadEvents(
     String masjidId, {
     bool includePending = false,
+    String? statusFilter,
   }) async {
+    final generation = ++_generation;
+    _masjidId = masjidId;
+    _includePending = includePending;
+    _statusFilter = statusFilter;
+    _upcomingOnly = false;
+    _streamSub?.cancel();
+    _loadingMore = false;
+    _events = [];
+    _hasMore = false;
+    _error = null;
     _isLoading = true;
     notifyListeners();
 
     try {
-      _events = await _repository.getEvents(
+      final page = await _repository.getEvents(
         masjidId,
         includePending: includePending,
+        statusFilter: statusFilter,
       );
+      if (generation != _generation) return;
+      _hasMore = page.length > 30;
+      _events = page.take(30).toList();
       _error = null;
     } catch (e) {
+      if (generation != _generation) return;
       _error = e.toString();
     }
 
@@ -62,17 +87,36 @@ class EventProvider extends ChangeNotifier {
   /// Listen to real-time updates for events. Cancels any prior subscription
   /// (tab switching recreates pages) and returns the new subscription so the
   /// caller can cancel it in dispose().
-  StreamSubscription<List<Event>> subscribeToEvents(String masjidId) {
+  StreamSubscription<List<Event>> subscribeToEvents(
+    String masjidId, {
+    bool upcomingOnly = false,
+  }) {
+    final generation = ++_generation;
+    _masjidId = masjidId;
+    _includePending = false;
+    _statusFilter = null;
+    _upcomingOnly = upcomingOnly;
+    _events = [];
+    _hasMore = false;
+    _loadingMore = false;
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
     _streamSub?.cancel();
     final sub = _repository
-        .getEventsStream(masjidId)
+        .getEventsStream(masjidId, upcomingOnly: upcomingOnly)
         .listen(
           (events) {
-            _events = events;
+            if (generation != _generation) return;
+            _events = events.take(30).toList();
+            _hasMore = events.length > 30;
+            _isLoading = false;
             _error = null;
             notifyListeners();
           },
           onError: (Object error) {
+            if (generation != _generation) return;
+            _isLoading = false;
             _error = error.toString();
             notifyListeners();
           },
@@ -81,8 +125,42 @@ class EventProvider extends ChangeNotifier {
     return sub;
   }
 
+  Future<void> loadMore() async {
+    if (_loadingMore || !_hasMore || _masjidId == null || _events.isEmpty) {
+      return;
+    }
+    // Older pages are a point-in-time view. Stop the head listener while
+    // browsing them so a new head snapshot cannot silently discard pages.
+    _streamSub?.cancel();
+    final generation = _generation;
+    _loadingMore = true;
+    notifyListeners();
+    try {
+      final page = await _repository.getEvents(
+        _masjidId!,
+        after: _events.last,
+        includePending: _includePending,
+        statusFilter: _statusFilter,
+        upcomingOnly: _upcomingOnly,
+      );
+      if (generation != _generation) return;
+      _hasMore = page.length > 30;
+      final ids = _events.map((item) => item.id).toSet();
+      _events.addAll(page.take(30).where((item) => !ids.contains(item.id)));
+      _error = null;
+    } catch (error) {
+      if (generation == _generation) _error = error.toString();
+    } finally {
+      if (generation == _generation) {
+        _loadingMore = false;
+        notifyListeners();
+      }
+    }
+  }
+
   @override
   void dispose() {
+    _generation++;
     _streamSub?.cancel();
     super.dispose();
   }

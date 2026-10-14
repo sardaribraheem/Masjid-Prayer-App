@@ -23,7 +23,7 @@ class EnhancedEventCard extends StatelessWidget {
       'Sep',
       'Oct',
       'Nov',
-      'Dec'
+      'Dec',
     ];
 
     return '${days[date.weekday - 1]}, ${date.day} ${months[date.month - 1]}';
@@ -69,14 +69,16 @@ class EnhancedEventCard extends StatelessWidget {
           Icon(
             event.isVideoMedia ? Icons.videocam : Icons.image,
             size: 38,
-            color: ColorPalette.primary,
+            color: Theme.of(context).colorScheme.primary,
           ),
           const SizedBox(height: 8),
           Text(
             event.isVideoMedia ? 'Video attachment' : 'Image attachment',
             style: TextStyle(
               fontSize: 12,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.7),
             ),
           ),
         ],
@@ -86,7 +88,9 @@ class EnhancedEventCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final categoryColor = _getCategoryColor();
+    final categoryColor = Theme.of(context).brightness == Brightness.dark
+        ? Theme.of(context).colorScheme.primary
+        : _getCategoryColor();
     final cardColor = Theme.of(context).colorScheme.surface;
     final onSurface = Theme.of(context).colorScheme.onSurface;
 
@@ -133,7 +137,7 @@ class EnhancedEventCard extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: ColorPalette.primary,
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -206,7 +210,8 @@ class EnhancedEventCard extends StatelessWidget {
                       ? Image.network(
                           event.mediaUrl!,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _buildMediaFallback(context, event),
+                          errorBuilder: (_, __, ___) =>
+                              _buildMediaFallback(context, event),
                         )
                       : _buildMediaFallback(context, event),
                 ),
@@ -220,7 +225,9 @@ class EnhancedEventCard extends StatelessWidget {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.6),
+                  color: Theme.of(
+                    context,
+                  ).scaffoldBackgroundColor.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: Theme.of(context).colorScheme.outline,
@@ -241,7 +248,7 @@ class EnhancedEventCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
-                          color: ColorPalette.primary,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                     ),
@@ -256,7 +263,7 @@ class EnhancedEventCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
-                        color: ColorPalette.primary,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                   ],

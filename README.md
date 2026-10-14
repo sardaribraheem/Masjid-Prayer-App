@@ -1,88 +1,37 @@
 # Masjid Prayer App
 
-A Flutter app for mosque communities, built for the first real deployment at **Hassan Masjid**. Users select their masjid, view prayer times, browse community events, post questions answered by imams/admins, request verification, and manage settings (dark mode, English/Urdu, RTL).
+Flutter Android MVP for masjid communities, using Firebase Authentication, Firestore, Provider, and English/Urdu with RTL support. The app provides masjid selection, prayer times, approved events, text-only community posts and comments, member verification, and scoped imam management.
 
-> **Goal:** *Real User → Real Firebase → Real Data → Real Imam/Admin → Real Persistence.* No fakery, no silent fallback to sample data. See [`latesttodo.md`](latesttodo.md) for the full Phase 1 MVP roadmap.
+## Launch status
 
-## Tech Stack
+The current implementation has local Flutter, security-emulator, and browser QA evidence. This is not production or Android device acceptance. [launchplan.md](launchplan.md) records phase progress, and [MVP_REVIEW.md](MVP_REVIEW.md) retains the initial findings. See [UI QA](scripts/qa/UI_QA.md) for the latest checks and limits.
 
-- **Flutter / Dart** (SDK ^3.9.0)
-- **Firebase** — Auth (email/password, Google), Firestore, (web + Android config)
-  - Project: `masjid-prayer-app-49f50`
-- **Provider** (ChangeNotifier state management)
-- **shared_preferences** (local persistence)
-- **geolocator** (nearby-masjid distance sorting)
-- **google_fonts** (Poppins typography)
-- **intl** (date/time formatting)
+Android is the only launch target. The final application ID remains pending; the existing registration is `com.example.masjid_app`. Release signing, reviewed production role migration, rules/index deployment, and real-device acceptance remain release gates. See [Android release instructions](scripts/qa/ANDROID_RELEASE.md).
 
-## Setup
+Notification scheduling and attendance registration are deferred. Google sign-in UI is disabled unless `ENABLE_GOOGLE_SIGN_IN=true`; enable it only after OAuth configuration and device verification. Community attachments and uploads are excluded. Anonymous posting hides the display name; stored author UIDs remain readable.
 
-```bash
+## Development
+
+Read `AGENTS.md`, `CLAUDE.md`, `FINALTODO.md`, and `launchplan.md` before changes.
+
+```sh
 flutter pub get
-flutter run -d chrome   # web (fully configured)
-flutter run             # connected Android device (via google-services.json)
-flutter build apk       # release build
+flutter analyze
+flutter test
+flutter run # connected Android device
+flutter build apk --debug --target-platform android-arm64
 ```
 
-`lib/firebase_options.dart` contains real credentials for **web** and placeholders for other platforms. Android authenticates through `android/app/google-services.json`, so don't rely on the Dart placeholder values on native.
+Provide the project's Android `google-services.json` locally; it is ignored by Git. Android startup uses the native configuration. Other native targets have placeholder Dart options and are not launch targets. Poppins fonts and Streamline icons are bundled for offline rendering; [asset attribution](assets/README.md) and the font license accompany them.
 
-Firestore rules/indexes:
-```bash
-firebase deploy --only firestore:rules
-```
+For browser QA, use the isolated local demo emulators described in [UI QA](scripts/qa/UI_QA.md). Do not seed fixtures into production. [Security test instructions](test/firestore/README.md) and [trusted administrator bootstrap/migration](scripts/admin/README.md) are separate from visual QA.
 
-## Architecture
+## Authorization and data lifecycle
 
-```
-lib/
-├── main.dart              # Entry point + routing
-├── models/app_data.dart   # Models + AppData static globals
-├── screens/               # 17 screens (masjid selection, prayer, community, Q&A, settings, admin panels)
-├── services/              # firebase_service, storage_service, location_service
-├── repositories/          # question/event/masjid Firestore CRUD
-├── providers/             # Auth, Question, Event, Masjid, Location, Settings (ChangeNotifier)
-├── l10n/                  # Manual EN/UR localization (key-based + RTL)
-├── theme/                 # ColorPalette + light/dark themes
-├── utils/                 # distance, time, validation helpers
-└── widgets/               # Shared UI components
-```
+New accounts are ordinary members. Approved verification controls event proposals; publication requires manager approval unless the member has an explicit full grant. Imam access requires a reviewed assignment and a protected masjid grant. Super-admin access requires the server-issued `superAdmin` claim; email addresses grant no privileges. UI checks supplement Firestore rules.
 
-**Data flow:** Firestore → Repository/Service → Provider → UI (`context.watch`). Real-time updates via `snapshots()` streams underneath the providers.
+Posts and events load in pages of 30 with a lookahead document; comments load on demand with older-page navigation. Older pages are snapshots; Refresh reconnects to the newest feed. Event text/category search and community answer filters apply to loaded pages. The manager's pending-event queue is queried separately from approved history.
 
-## Roles (as modeled)
+Post deletion freezes replies, deletes child comments in batches, then deletes the post. Account deletion requires recent authentication, freezes contributions, removes UID-attributed content and profile, then deletes Auth. Interrupted cleanup is retryable and may partially complete. Managers require reviewed transfer/revocation; legacy content without creator UIDs needs migration. No automatic archival or expiry is promised.
 
-```
-guest → muqtaddi (new account) → verifiedMuqtaddi → imam → admin
-```
-
-- Registered users start as a plain **Muqtaddi** (`role` stored in Firestore `users/{uid}`, never self-elevated).
-- Roadmap adds: **Verification Request → Verified Muqtaddi** (event approval-required | full event-posting permission) + separate **Imam/Admin** track.
-- Google login does NOT auto-elevate to admin; roles come from the Firestore doc.
-
-## Current Status
-
-- ✅ App runs on Android (Redmi 12C) and web; prayer times, masjid selection, navigation functional
-- ✅ **Hassan Masjid** (`6qkkBODeZ8kLHkNOCjqx`) is patched & clean in Firestore: no `password` field, `nameUrdu=حسن مسجد`, 6 prayers (Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha)
-- ✅ Email/password register + login for normal Muqtaddis (done) — **anonymous auth removed**
-- ✅ Q&A flow verified E2E: ask question → real Firestore doc → survives reload
-- ✅ Playwright UI verification: all 4 pages × light/dark × mobile/desktop × English/Urdu-RTL
-- ✅ Countdown language + bottom-nav "Time" label + Tablighi→Jammat rename (done)
-- 🚧 In progress: delete leftover sample masjid docs, verification flow, verified-event permissions, Urdu *prayer-name* translations, profile/RBAC UI, branding/icons — tracked in [`latesttodo.md`](latesttodo.md)
-
-> ⚠️ **Firestore admin writes (2026-09-16):** the CLI's cached refresh token is invalid
-> (`INVALID_REFRESH_TOKEN`); run `firebase login` to re-auth before any scripted Firestore
-> admin work. Raw REST deletes are also gated by the classifier — name exact doc IDs. The
-> app itself still works against the real project.
-
-## Dev Notes
-
-- No automated tests yet — `flutter analyze` is the static check.
-- Keep all UI strings in `lib/l10n/` (English + Urdu, RTL-aware).
-- Verify every feature against REAL Firestore before marking it done.
-- **Never store plaintext passwords in Firestore** (Hassan Masjid's `password` field was stripped for exactly this reason).
-- Read `latesttodo.md` first — it is the authoritative Phase 1 roadmap and wears a ⚠️ READ-THIS-FIRST block with the current Firestore-access blocker.
-## Current launch work (8 October 2026)
-
-Use [launchplan.md](launchplan.md) for current implementation status; earlier completion claims above are historical and do not certify the current build. Android is the only MVP launch target. The final application ID and release signing remain pending. Notification scheduling and attendance registration are deferred.
-
-Local authorization and core account/member workflow changes pass the Firestore emulator suite and Flutter checks. Production still needs reviewed manager migration, the trusted administrator claim, new indexes/rules, and client/device acceptance. See [test instructions](test/firestore/README.md) and [administrator bootstrap instructions](scripts/admin/README.md). Nothing was deployed during the local review.
+Production deployments must pair reviewed rules, indexes, migration, and compatible app behavior. Local tests do not establish deployed Firebase behavior. Do not deploy or publish implicitly during code review.

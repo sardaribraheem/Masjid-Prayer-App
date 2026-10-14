@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'models/app_data.dart';
 import 'screens/masjid_selection_screen.dart';
@@ -24,12 +25,15 @@ void main() async {
   // the Flutter web CanvasKit renderer (which hides the DOM by default).
   binding.ensureSemantics();
 
+  GoogleFonts.config.allowRuntimeFetching = false;
+
   // Initialize localization
   await appLocalization.initialize();
 
   // Initialize services
   final storageService = StorageService();
   await storageService.initialize();
+  appStateProvider.setDarkMode(storageService.getTheme() == 'dark');
 
   final firebaseService = FirebaseService();
   await firebaseService.initialize();

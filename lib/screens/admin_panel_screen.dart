@@ -111,7 +111,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           data: Theme.of(context).copyWith(
             timePickerTheme: TimePickerThemeData(
               backgroundColor: Theme.of(context).colorScheme.surface,
-              dialBackgroundColor: ColorPalette.primary.withValues(alpha: 0.1),
+              dialBackgroundColor: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.1),
               hourMinuteShape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -141,7 +143,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           data: Theme.of(context).copyWith(
             timePickerTheme: TimePickerThemeData(
               backgroundColor: Theme.of(context).colorScheme.surface,
-              dialBackgroundColor: ColorPalette.primary.withValues(alpha: 0.1),
+              dialBackgroundColor: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.1),
               hourMinuteShape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -281,7 +285,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         title: Text(
           '${masjid.name} - ${appLocalization.t(AppStrings.adminImmam)}',
         ),
-        backgroundColor: ColorPalette.primary,
         elevation: 0,
         actions: [
           // Logout button
@@ -292,7 +295,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                 onPressed: isSaving ? null : handleLogout,
                 child: Text(
                   appLocalization.t(AppStrings.logout),
-                  style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                 ),
               ),
             ),
@@ -309,8 +314,13 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: ColorPalette.primary.withValues(alpha: 0.1),
-                border: Border.all(color: ColorPalette.primary, width: 1),
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.1),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.primary,
+                  width: 1,
+                ),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
@@ -320,7 +330,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                     children: [
                       Icon(
                         Icons.schedule,
-                        color: ColorPalette.primary,
+                        color: Theme.of(context).colorScheme.primary,
                         size: 20,
                       ),
                       const SizedBox(width: 8),
@@ -329,7 +339,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: ColorPalette.primary,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                     ],
@@ -343,7 +353,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   Text(
                     masjid.location,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                 ],
@@ -423,7 +435,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                     child: Container(
                       decoration: BoxDecoration(
                         border: Border.all(
-                          color: ColorPalette.primary,
+                          color: Theme.of(context).colorScheme.primary,
                           width: 1,
                         ),
                         borderRadius: BorderRadius.circular(12),
@@ -457,7 +469,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                   ),
                                 ),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: ColorPalette.primary,
+                                  backgroundColor: Theme.of(
+                                    context,
+                                  ).colorScheme.primary,
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 12,
@@ -552,7 +566,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       );
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: ColorPalette.primary,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     icon: Icon(
@@ -581,7 +595,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       );
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: ColorPalette.primary,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     icon: Icon(
@@ -606,9 +620,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
               child: ElevatedButton(
                 onPressed: isSaving ? null : handleSave,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: ColorPalette.success,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  disabledBackgroundColor: Theme.of(context).colorScheme.outline,
+                  disabledBackgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.outline,
                 ),
                 child: isSaving
                     ? SizedBox(

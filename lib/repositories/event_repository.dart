@@ -10,18 +10,43 @@ class EventRepository {
   Query<Map<String, dynamic>> _query(
     String masjidId, {
     bool includePending = false,
+    bool upcomingOnly = false,
+    String? statusFilter,
   }) {
     Query<Map<String, dynamic>> query = _firestore
         .collection('masjids')
         .doc(masjidId)
         .collection('events');
-    if (!includePending) query = query.where('status', isEqualTo: 'approved');
-    return query.orderBy('eventDate', descending: false);
+    if (!includePending) {
+      query = query.where('status', isEqualTo: 'approved');
+    } else if (statusFilter != null) {
+      query = query.where('status', isEqualTo: statusFilter);
+    }
+    if (upcomingOnly) {
+      final now = DateTime.now();
+      query = query.where(
+        'eventDate',
+        isGreaterThanOrEqualTo: DateTime(
+          now.year,
+          now.month,
+          now.day,
+        ).toIso8601String(),
+      );
+    }
+    return query
+        .orderBy('eventDate', descending: false)
+        .orderBy(FieldPath.documentId);
   }
 
   /// Get a stream of events for a specific masjid
-  Stream<List<Event>> getEventsStream(String masjidId) {
-    return _query(masjidId).snapshots().map((snapshot) {
+  Stream<List<Event>> getEventsStream(
+    String masjidId, {
+    bool upcomingOnly = false,
+  }) {
+    return _query(
+      masjidId,
+      upcomingOnly: upcomingOnly,
+    ).limit(31).snapshots().map((snapshot) {
       return snapshot.docs
           .map((doc) => Event.fromJson({...doc.data(), 'id': doc.id}))
           .toList();
@@ -32,12 +57,21 @@ class EventRepository {
   Future<List<Event>> getEvents(
     String masjidId, {
     bool includePending = false,
+    bool upcomingOnly = false,
+    String? statusFilter,
+    Event? after,
   }) async {
     try {
-      final snapshot = await _query(
+      var query = _query(
         masjidId,
         includePending: includePending,
-      ).get();
+        upcomingOnly: upcomingOnly,
+        statusFilter: statusFilter,
+      );
+      if (after != null) {
+        query = query.startAfter([after.eventDate.toIso8601String(), after.id]);
+      }
+      final snapshot = await query.limit(31).get();
       return snapshot.docs
           .map((doc) => Event.fromJson({...doc.data(), 'id': doc.id}))
           .toList();

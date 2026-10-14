@@ -38,8 +38,8 @@ service cloud.firestore {
     function parentAcceptsComments(masjidId, questionId) {
       let parent = get(/databases/$(database)/documents/masjids/$(masjidId)/questions/$(questionId));
       let author = parent.data.get('createdByUid', null);
-      return author == null || (exists(/databases/$(database)/documents/users/$(author)) &&
-        getUserDoc(author).get('deletionRequestedAt', null) == null);
+      return parent.data.get('isDeleting', false) == false && (author == null || (exists(/databases/$(database)/documents/users/$(author)) &&
+        getUserDoc(author).get('deletionRequestedAt', null) == null));
     }
 
     // ============ MASJID DOCUMENTS ============
@@ -77,8 +77,18 @@ service cloud.firestore {
         // Only the assigned imam/admin for the masjid can answer or moderate
         // questions.
         allow update: if (isMasjidManager(masjidId) || isSuperAdmin()) &&
+          request.resource.data.answer is string &&
+          request.resource.data.answer.size() > 0 &&
+          request.resource.data.answer.size() <= 4000 &&
+          request.resource.data.isAnswered == true &&
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['answer', 'isAnswered']);
+
+        // Freeze replies before a retryable parent + comment cleanup.
+        allow update: if isSignedIn() &&
+          (resource.data.createdByUid == request.auth.uid || isMasjidManager(masjidId) || isSuperAdmin()) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isDeleting']) &&
+          request.resource.data.isDeleting == true;
 
         // Only admin/imam can delete questions
         allow delete: if isMasjidManager(masjidId) || isSuperAdmin() ||

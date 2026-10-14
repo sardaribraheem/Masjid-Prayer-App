@@ -17,27 +17,16 @@ class SettingsProvider extends ChangeNotifier {
   String get locale => _locale;
 
   SettingsProvider() {
-    _loadSettings();
-  }
-
-  /// Load saved settings from local storage
-  Future<void> _loadSettings() async {
-    final theme = _storageService.getTheme();
-    _isDarkMode = theme == 'dark';
-    _locale = _storageService.getLanguage() ?? 'en';
-
-    // Sync with the existing appStateProvider
-    if (appStateProvider.isDarkMode != _isDarkMode) {
-      appStateProvider.toggleDarkMode();
-    }
-
-    notifyListeners();
+    // Startup restores global preferences before the widget tree is built.
+    // Reading them here must not notify ancestors during a build.
+    _isDarkMode = appStateProvider.isDarkMode;
+    _locale = appLocalization.locale;
   }
 
   /// Toggle dark mode and persist
   Future<void> toggleDarkMode() async {
     _isDarkMode = !_isDarkMode;
-    appStateProvider.toggleDarkMode();
+    appStateProvider.setDarkMode(_isDarkMode);
     await _storageService.saveTheme(_isDarkMode ? 'dark' : 'light');
     notifyListeners();
   }

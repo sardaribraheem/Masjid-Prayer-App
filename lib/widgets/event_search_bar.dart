@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../l10n/app_localization.dart';
 
 /// Search Bar Widget for Community Page
 /// Allows filtering events by title, description, and masjid name
@@ -55,7 +56,9 @@ class _EventSearchBarState extends State<EventSearchBar> {
         decoration: InputDecoration(
           hintText: widget.hintText,
           hintStyle: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.8),
             fontSize: 14,
           ),
           prefixIcon: Icon(
@@ -64,12 +67,12 @@ class _EventSearchBarState extends State<EventSearchBar> {
             size: 20,
           ),
           suffixIcon: _controller.text.isNotEmpty
-              ? GestureDetector(
-                  onTap: () {
+              ? IconButton(
+                  tooltip: appLocalization.t('clear'),
+                  onPressed: () {
                     _controller.clear();
-                    widget.onSearchChanged('');
                   },
-                  child: Icon(
+                  icon: Icon(
                     Icons.close,
                     color: ColorPalette.secondary,
                     size: 20,

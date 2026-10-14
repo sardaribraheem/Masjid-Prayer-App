@@ -33,6 +33,7 @@ class MasjidProvider extends ChangeNotifier {
         .where(
           (m) =>
               m.name.toLowerCase().contains(query) ||
+              m.nameUrdu.toLowerCase().contains(query) ||
               m.location.toLowerCase().contains(query),
         )
         .toList();
@@ -61,7 +62,10 @@ class MasjidProvider extends ChangeNotifier {
   }
 
   /// Fetch masjids sorted by user location
-  Future<void> loadMasjidsWithLocation(double latitude, double longitude) async {
+  Future<void> loadMasjidsWithLocation(
+    double latitude,
+    double longitude,
+  ) async {
     _userLatitude = latitude;
     _userLongitude = longitude;
 
@@ -128,9 +132,9 @@ class MasjidProvider extends ChangeNotifier {
     }
 
     _allMasjids.sort(
-      (a, b) =>
-          (a.distanceFromUser ?? double.infinity)
-              .compareTo(b.distanceFromUser ?? double.infinity),
+      (a, b) => (a.distanceFromUser ?? double.infinity).compareTo(
+        b.distanceFromUser ?? double.infinity,
+      ),
     );
   }
 }

@@ -51,29 +51,33 @@ Status: **in progress** = work underway; **local verified** = code and local che
 
 ## Phase 3 — Community reliability, cost, and truthful behavior (10–12 October)
 
-**Status: pending.** Addresses the remaining feed/privacy findings.
+**Status: implemented with local QA; broader device and staging acceptance remains open.** Addresses the remaining feed/privacy findings.
 
 - [x] Align guest UI and read rules; approved events and community reading must behave as advertised, while private/pending content stays protected.
-- [ ] Add bounded post/event queries and pagination without hiding the manager's pending queue.
-- [ ] Remove duplicate fetch/listen requests; correctly cancel/resubscribe on user and masjid changes and display stream errors/retries.
-- [ ] Add older-comment pagination, author/manager delete controls, and parent-deletion handling. Firestore does not recursively remove subcollections; explicitly handle orphan comments.
-- [ ] Prevent duplicate submissions and preserve drafts after failed writes on all relevant forms.
-- [ ] Make Upcoming/Nearby/All filters change the actual results; remove controls that have no meaningful MVP behavior.
-- [ ] Update privacy policy, English/Urdu strings, notification UI, README, and FINALTODO to match tested capabilities.
-- [ ] Confirm long text, empty input, RTL, keyboard scrolling, and anonymous-display behavior.
+- [x] Add bounded post/event queries and pagination without hiding the manager's pending queue.
+- [x] Remove duplicate fetch/listen requests; correctly cancel/resubscribe on user and masjid changes and display stream errors/retries.
+- [x] Add older-comment pagination, author/manager delete controls, and parent-deletion handling. Firestore does not recursively remove subcollections; explicitly handle orphan comments.
+- [x] Community, comment, event, and answer forms disable duplicate submissions and close only after successful saves; failures retain their drafts.
+- [ ] Complete failure/recovery acceptance for profile, imam onboarding, and claims on Android and staging.
+- [x] Make Upcoming/Nearby/All filters change the actual results; remove controls that have no meaningful MVP behavior.
+- [x] Update privacy policy, English/Urdu strings, notification UI, README, and FINALTODO to match tested capabilities.
+- [x] Check browser light/dark, English/Urdu RTL, text-only community controls, and narrow layouts.
+- [ ] Complete actual Android keyboard, long input, restart, offline/reconnect, and accessibility acceptance across every form.
 
 **Gate:** no unbounded feed reads, no duplicate listeners after navigation, no inaccessible error states, no orphaned comment promises, and no UI or policy claims for absent features.
 
 ## Phase 4 — Release configuration (12–13 October)
 
-**Status: pending.** Addresses blocker 4 and native configuration.
+**Status: debug build verified; final identity, signing, and device acceptance pending.** Addresses blocker 4 and native configuration.
 
 - [x] Confirm Android-only launch scope.
 - [ ] Confirm the final application ID before changing Firebase registrations.
-- [ ] Configure a release keystore via ignored local configuration/environment. Never commit passwords or keys; remove debug signing from production builds.
-- [ ] Verify native Firebase options, actual google-services configuration, Google sign-in setup (or omit that method until configured), and startup error behavior.
+- [x] Remove debug signing fallback and require ignored owner-controlled release signing configuration.
+- [ ] Supply and verify the owner's release keystore and final identity in the reviewed release environment.
+- [x] Android initializes from native Firebase configuration; omit Google sign-in UI by default. Build the current source as an ARM64 debug APK.
+- [ ] Verify signed startup, Firebase authentication, password recovery delivery, and persistence on Android. Missing-config startup recovery remains to be accepted.
 - [ ] Build release APK/AAB, verify installed behavior on target Android devices, version/build number, permissions, icons, and store metadata.
-- [ ] Document tested supported platforms; do not advertise placeholder configurations.
+- [x] Document Android-only launch, browser QA scope, and placeholder native platforms.
 
 **Gate:** a reproducible release build uses the intended Firebase app and release signing; real-device authentication and data operations pass. Application identity/signing choices require the owner's concrete values.
 
@@ -105,3 +109,14 @@ Plan created. Initial review found claim approval changed only request status, i
 - Members can request verification; scoped managers approve/reject. Verified members can submit events with backend-enforced approval/full permission. Events preserve real document IDs and author metadata. Pending events are private; guests read approved events and community text.
 - Validation: `flutter analyze` clean; 6 Flutter model tests passed; 27 Firestore emulator cases passed using `demo-masjid-rules`; JavaScript syntax checks passed. These rule tests do not establish client UI behavior or production deployment.
 - No production rules/indexes/claims/data changed. Deploy the new indexes together with reviewed rules and the compatible app after migration and staging checks. Remaining work starts at Phase 3; Phase 2 client acceptance also remains open.
+
+
+### 14 October — UI, reliability, and local acceptance
+
+- Redesigned prayer times, masjid selection, public feeds, and settings around a shared emerald/cream Material theme. Dark mode uses readable theme colors; fonts and six Streamline Nova icons are bundled. English/Urdu changes update visible screens immediately, and Urdu masjid names are searchable.
+- Location is optional and requested explicitly. Timetable parsing/countdowns handle unset times, sunrise, ordering, midnight, and Friday Jummah safely. Notification scheduling and attendance remain excluded.
+- Post/event/comment reads are bounded and paginated. Removed duplicate initial reads, added refresh/error recovery, kept older pages stable, and queried manager pending events separately. Explicit post cleanup blocks new replies and removes descendants before the parent.
+- Event categories now agree between creation and filtering. Upcoming filters dates/end times; the ineffective Nearby control was removed. Event/answer dialogs preserve failed drafts, and answer cards update after saves. Password recovery and accessible password controls are available in login; signup returns to the signed-in app and passes a 320×400 browser check.
+- Privacy and README now describe public text, name hiding, optional location, real retention, retryable deletion, and release limits. QA fixtures use only hardcoded localhost demo endpoints.
+- Evidence: 31 Firestore emulator tests, 10 Flutter tests, clean analysis, an ARM64 Android debug APK, and 29 repeatable Playwright assertions against local Auth/Firestore. See [UI_QA.md](scripts/qa/UI_QA.md) for the tested flows and exact limitations. No Android device was connected; no signed release or production deployment was performed.
+- Remaining gates: final application ID, owner signing, reviewed grants/legacy migration, trusted super-admin bootstrap, production indexes/rules, staging interruption/restart failures, actual Android keyboard/offline/restart/deletion acceptance, and store metadata. Local success is not a launch certification.

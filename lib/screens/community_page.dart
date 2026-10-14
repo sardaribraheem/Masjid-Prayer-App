@@ -2,16 +2,17 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/app_data.dart';
+import '../providers/masjid_provider.dart';
 import '../providers/event_provider.dart';
 import '../providers/auth_provider.dart';
 import 'admin_events_screen.dart';
 import '../widgets/event_search_bar.dart';
 import '../widgets/category_slider.dart';
+import '../utils/prayer_schedule.dart';
 import '../widgets/enhanced_event_card.dart';
 import '../widgets/shared/empty_state.dart';
 import '../l10n/app_localization.dart';
 import '../l10n/app_strings.dart';
-import '../theme/app_theme.dart';
 
 /// Community Page - Shows events from masjids with search and category filtering
 class CommunityPage extends StatefulWidget {
@@ -28,21 +29,20 @@ class _CommunityPageState extends State<CommunityPage> {
 
   StreamSubscription<List<Event>>? _eventSub;
 
+  String? _listeningMasjidId;
   @override
-  void initState() {
-    super.initState();
-    // Defer past the first frame: loadEvents()/subscribeToEvents() notify
-    // synchronously, which would otherwise trigger "setState() called during
-    // build". Subscribing here (not in build) also avoids creating a new
-    // Firestore listener on every rebuild.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _loadEvents();
-      final masjidId = AppData.selectedMasjid?.id ?? '';
-      if (masjidId.isNotEmpty) {
-        _eventSub = context.read<EventProvider>().subscribeToEvents(masjidId);
-      }
-    });
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final id =
+        (context.watch<MasjidProvider>().selectedMasjid ??
+                AppData.selectedMasjid)
+            ?.id;
+    if (id != _listeningMasjidId) {
+      _listeningMasjidId = id;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && id == _listeningMasjidId) _loadEvents();
+      });
+    }
   }
 
   @override
@@ -54,7 +54,11 @@ class _CommunityPageState extends State<CommunityPage> {
   Future<void> _loadEvents() async {
     final masjidId = AppData.selectedMasjid?.id ?? '';
     if (masjidId.isNotEmpty) {
-      await context.read<EventProvider>().loadEvents(masjidId);
+      _eventSub?.cancel();
+      _eventSub = context.read<EventProvider>().subscribeToEvents(
+        masjidId,
+        upcomingOnly: _filterType == 'upcoming',
+      );
     }
   }
 
@@ -68,41 +72,37 @@ class _CommunityPageState extends State<CommunityPage> {
         user.masjidId != masjid.id) {
       return;
     }
-    final result = await showEventProposalForm(context);
-    if (!mounted ||
-        result == null ||
-        context.read<AuthProvider>().currentUser?.id != user.id) {
-      return;
-    }
-    final success = await context.read<EventProvider>().addEvent(
-      Event(
-        id: '',
-        title: result.title,
-        description: result.description,
-        masjidId: masjid.id,
-        masjidName: masjid.name,
-        eventDate: result.eventDate,
-        startTime: result.startTime,
-        endTime: result.endTime,
-        location: result.location,
-        category: result.category,
-        status: user.canPublishEventsDirectly
-            ? EventStatus.approved
-            : EventStatus.pending,
-        createdByUid: user.id,
-        createdByName: user.username,
-      ),
-    );
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          appLocalization.t(
-            success ? 'event_proposal_submitted' : 'error_occurred',
+    final provider = context.read<EventProvider>();
+    final result = await showEventProposalForm(
+      context,
+      onSubmit: (draft) async {
+        if (auth.currentUser?.id != user.id) return false;
+        return provider.addEvent(
+          Event(
+            id: '',
+            title: draft.title,
+            description: draft.description,
+            masjidId: masjid.id,
+            masjidName: masjid.name,
+            eventDate: draft.eventDate,
+            startTime: draft.startTime,
+            endTime: draft.endTime,
+            location: draft.location,
+            category: draft.category,
+            status: user.canPublishEventsDirectly
+                ? EventStatus.approved
+                : EventStatus.pending,
+            createdByUid: user.id,
+            createdByName: user.username,
           ),
-        ),
-      ),
+        );
+      },
     );
+    if (result != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(appLocalization.t('event_proposal_submitted'))),
+      );
+    }
   }
 
   /// Get category definitions with localized labels
@@ -129,6 +129,11 @@ class _CommunityPageState extends State<CommunityPage> {
         icon: Icons.group,
       ),
       CategoryItem(
+        id: 'Other',
+        label: appLocalization.t('other'),
+        icon: Icons.event_outlined,
+      ),
+      CategoryItem(
         id: 'Gasht',
         label: appLocalization.t(AppStrings.gasht),
         icon: Icons.directions_walk,
@@ -141,6 +146,21 @@ class _CommunityPageState extends State<CommunityPage> {
     final provider = context.watch<EventProvider>();
     List<Event> events = provider.getApprovedEventsByMasjid(masjidId);
 
+    if (_filterType == 'upcoming') {
+      final now = DateTime.now();
+      events = events.where((event) {
+        final date = event.eventDate.toLocal();
+        final minutes = parsePrayerMinutes(event.endTime) ?? 1439;
+        final ends = DateTime(
+          date.year,
+          date.month,
+          date.day,
+          minutes ~/ 60,
+          minutes % 60,
+        );
+        return ends.isAfter(now);
+      }).toList();
+    }
     // Apply category filter
     if (_selectedCategory != 'all') {
       events = events
@@ -166,14 +186,25 @@ class _CommunityPageState extends State<CommunityPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: appLocalization,
+    builder: (context, _) => _buildLocalized(context),
+  );
+
+  Widget _buildLocalized(BuildContext context) {
     final filteredEvents = _getFilteredEvents();
 
     return Scaffold(
       appBar: AppBar(
         title: Text(appLocalization.t(AppStrings.communityEvents)),
-        backgroundColor: ColorPalette.primary,
         elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: appLocalization.t(AppStrings.refresh),
+            onPressed: _loadEvents,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
       ),
       floatingActionButton:
           context.watch<AuthProvider>().currentUser?.canSubmitEvents == true &&
@@ -185,7 +216,7 @@ class _CommunityPageState extends State<CommunityPage> {
               label: Text(appLocalization.t('propose_event')),
             )
           : null,
-      body: Column(
+      body: ListView(
         children: [
           // Search Bar
           EventSearchBar(
@@ -214,50 +245,57 @@ class _CommunityPageState extends State<CommunityPage> {
                   _FilterButton(
                     label: appLocalization.t(AppStrings.upcoming),
                     isSelected: _filterType == 'upcoming',
-                    onTap: () => setState(() => _filterType = 'upcoming'),
-                  ),
-                  const SizedBox(width: 10),
-                  _FilterButton(
-                    label: appLocalization.t(AppStrings.nearby),
-                    isSelected: _filterType == 'nearby',
-                    onTap: () => setState(() => _filterType = 'nearby'),
+                    onTap: () {
+                      setState(() => _filterType = 'upcoming');
+                      _loadEvents();
+                    },
                   ),
                   const SizedBox(width: 10),
                   _FilterButton(
                     label: appLocalization.t(AppStrings.allEvents),
                     isSelected: _filterType == 'all',
-                    onTap: () => setState(() => _filterType = 'all'),
+                    onTap: () {
+                      setState(() => _filterType = 'all');
+                      _loadEvents();
+                    },
                   ),
                 ],
               ),
             ),
           ),
 
-          // Events List
-          Expanded(
-            child: context.watch<EventProvider>().isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : filteredEvents.isEmpty
-                ? EmptyState(
-                    icon: Icons.event_outlined,
-                    title: appLocalization.t(AppStrings.noEvents),
-                    subtitle: appLocalization.t(
-                      AppStrings.eventsWillAppearHere,
-                    ),
-                    actionLabel: appLocalization.t(AppStrings.refresh),
-                    onAction: _loadEvents,
-                  )
-                : RefreshIndicator(
-                    onRefresh: _loadEvents,
-                    child: ListView.builder(
-                      padding: const EdgeInsets.only(bottom: 20, top: 8),
-                      itemCount: filteredEvents.length,
-                      itemBuilder: (context, index) {
-                        return EnhancedEventCard(event: filteredEvents[index]);
-                      },
-                    ),
-                  ),
-          ),
+          if (context.watch<EventProvider>().isLoading)
+            const Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (context.watch<EventProvider>().error != null)
+            EmptyState(
+              icon: Icons.cloud_off_outlined,
+              title: appLocalization.t('feed_error'),
+              actionLabel: appLocalization.t(AppStrings.refresh),
+              onAction: _loadEvents,
+            )
+          else if (filteredEvents.isEmpty)
+            EmptyState(
+              icon: Icons.event_outlined,
+              title: appLocalization.t(AppStrings.noEvents),
+              subtitle: appLocalization.t(AppStrings.eventsWillAppearHere),
+              actionLabel: appLocalization.t(AppStrings.refresh),
+              onAction: _loadEvents,
+            )
+          else
+            ...filteredEvents.map((event) => EnhancedEventCard(event: event)),
+          if (context.watch<EventProvider>().hasMore)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: OutlinedButton(
+                onPressed: context.watch<EventProvider>().loadingMore
+                    ? null
+                    : context.read<EventProvider>().loadMore,
+                child: Text(appLocalization.t('load_more')),
+              ),
+            ),
         ],
       ),
     );
@@ -277,30 +315,10 @@ class _FilterButton extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? ColorPalette.primary
-              : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected
-                ? Theme.of(context).colorScheme.onPrimary
-                : Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.6),
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            fontSize: 12,
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => ChoiceChip(
+    label: Text(label),
+    selected: isSelected,
+    onSelected: (_) => onTap(),
+    visualDensity: VisualDensity.standard,
+  );
 }

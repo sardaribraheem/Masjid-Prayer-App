@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../firebase_options.dart';
 import '../models/app_data.dart';
@@ -20,6 +21,9 @@ class FirebaseService {
   /// `lib/firebase_options.dart`. Run `flutterfire configure` to regenerate
   /// the file with project-specific credentials for android, ios, macos, etc.
   Future<void> initialize() async {
+    if (kReleaseMode && const bool.fromEnvironment('USE_FIREBASE_EMULATORS')) {
+      throw StateError('Emulator mode is unavailable in release builds.');
+    }
     // On Android, google-services.json auto-initializes Firebase via the
     // native GoogleServices plugin before Dart runs, so Firebase.apps
     // may appear empty while the native default app already exists.
@@ -27,7 +31,16 @@ class FirebaseService {
     // We guard with a try-catch so the app works regardless.
     try {
       await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
+        options: const bool.fromEnvironment('USE_FIREBASE_EMULATORS')
+            ? const FirebaseOptions(
+                apiKey: 'demo-api-key',
+                appId: '1:123:web:demo',
+                messagingSenderId: '123',
+                projectId: 'demo-masjid-rules',
+              )
+            : (!kIsWeb && defaultTargetPlatform == TargetPlatform.android)
+            ? null
+            : DefaultFirebaseOptions.currentPlatform,
       );
     } catch (e) {
       if (!e.toString().contains('duplicate-app')) rethrow;
@@ -35,30 +48,46 @@ class FirebaseService {
     }
     _firestore = FirebaseFirestore.instance;
 
+    if (const bool.fromEnvironment('USE_FIREBASE_EMULATORS')) {
+      if (kReleaseMode) {
+        throw StateError('Emulator mode is unavailable in release builds.');
+      }
+      _firestore.useFirestoreEmulator('127.0.0.1', 8080);
+      await FirebaseAuth.instance.useAuthEmulator('127.0.0.1', 9099);
+      _firestore.settings = const Settings(persistenceEnabled: false);
+      return;
+    }
     // Set Firestore settings for better performance
     _firestore.settings = const Settings(
       persistenceEnabled: true,
-      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+      cacheSizeBytes: 40 * 1024 * 1024,
     );
   }
 
   /// Fetch all masjids from Firestore
   Future<List<Masjid>> getAllMasjids() async {
     try {
-      final snapshot = await _firestore.collection('masjids').get();
+      final snapshot = await _firestore
+          .collection('masjids')
+          .get()
+          .timeout(const Duration(seconds: 15));
       return snapshot.docs
           .map((doc) => Masjid.fromFirestore(doc.data(), doc.id))
           .toList();
     } catch (e) {
       debugPrint('Error fetching masjids: $e');
-      return [];
+      rethrow;
     }
   }
 
   /// Get a specific masjid by ID
   Future<Masjid?> getMasjidById(String masjidId) async {
     try {
-      final doc = await _firestore.collection('masjids').doc(masjidId).get();
+      final doc = await _firestore
+          .collection('masjids')
+          .doc(masjidId)
+          .get()
+          .timeout(const Duration(seconds: 10));
       if (doc.exists) {
         return Masjid.fromFirestore(doc.data() ?? {}, doc.id);
       }
@@ -80,11 +109,9 @@ class FirebaseService {
 
   /// Stream of a specific masjid for real-time prayer time updates
   Stream<Masjid?> getMasjidStream(String masjidId) {
-    return _firestore
-        .collection('masjids')
-        .doc(masjidId)
-        .snapshots()
-        .map((snapshot) {
+    return _firestore.collection('masjids').doc(masjidId).snapshots().map((
+      snapshot,
+    ) {
       if (snapshot.exists) {
         return Masjid.fromFirestore(snapshot.data() ?? {}, snapshot.id);
       }
@@ -99,7 +126,10 @@ class FirebaseService {
     double userLon,
   ) async {
     try {
-      final snapshot = await _firestore.collection('masjids').get();
+      final snapshot = await _firestore
+          .collection('masjids')
+          .get()
+          .timeout(const Duration(seconds: 15));
       final masjids = snapshot.docs
           .map((doc) => Masjid.fromFirestore(doc.data(), doc.id))
           .toList();
@@ -156,7 +186,9 @@ class FirebaseService {
 
   /// Update prayer times for a masjid
   Future<bool> updatePrayerTimes(
-      String masjidId, List<PrayerTime> prayerTimes) async {
+    String masjidId,
+    List<PrayerTime> prayerTimes,
+  ) async {
     try {
       await _firestore.collection('masjids').doc(masjidId).update({
         'prayerTimes': prayerTimes.map((p) => p.toJson()).toList(),

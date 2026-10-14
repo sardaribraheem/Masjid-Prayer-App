@@ -57,3 +57,10 @@ android/app/google-services.json
 node_modules/
 .firebase/
 *-debug.log
+
+# Local Android signing credentials
+android/key.properties
+*.jks
+*.keystore
+
+/android/.kotlin/

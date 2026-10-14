@@ -125,6 +125,11 @@ test('only assigned managers can answer posts', async () => {
   await assertFails(updateDoc(doc(user(), 'masjids/a/questions/p'), {answer: 'Answer', isAnswered: true}));
   await assertFails(updateDoc(doc(user('forged'), 'masjids/a/questions/p'), {answer: 'Answer', isAnswered: true}));
 });
+test('manager answers reject empty, oversized, or non-text input', async () => {
+  for (const answer of ['', 'x'.repeat(4001), null, 123]) {
+    await assertFails(updateDoc(doc(user('imam'), 'masjids/a/questions/p'), {answer, isAnswered: true}));
+  }
+});
 test('comments enforce author, existing parent, timestamp, and text length', async () => {
   const comment = {text: 'Comment', createdByUid: 'member', userName: 'Member', timestamp: serverTimestamp()};
   await assertSucceeds(setDoc(doc(user(), 'masjids/a/questions/p/comments/valid'), comment));
@@ -255,4 +260,44 @@ test('guests read community text and approved events, but cannot read pending pr
   await assertFails(getDoc(doc(user('other'), 'masjids/a/events/pending')));
   await assertSucceeds(getDoc(doc(user(), 'masjids/a/events/pending')));
   await assertSucceeds(getDocs(collection(user('imam'), 'masjids/a/events')));
+});
+
+test('post deletion freezes replies without allowing authors to forge an answer', async () => {
+  await assertSucceeds(updateDoc(doc(user(), 'masjids/a/questions/p'), {isDeleting: true}));
+  await assertFails(updateDoc(doc(user(), 'masjids/a/questions/p'), {isDeleting: false}));
+  await assertFails(updateDoc(doc(user(), 'masjids/a/questions/p'), {answer: 'Forged', isAnswered: true}));
+  await assertFails(setDoc(doc(user('imam'), 'masjids/a/questions/p/comments/late'), {
+    text:'Late reply',createdByUid:'imam',userName:'Imam',timestamp:serverTimestamp()}));
+  await assertFails(updateDoc(doc(user('other'), 'masjids/a/questions/p'), {isDeleting: true}));
+});
+test('bounded question pagination handles equal timestamps without skipping posts', async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    const db=context.firestore(); const batch=writeBatch(db);
+    for(let i=0;i<35;i++) batch.set(doc(db,`masjids/a/questions/page-${String(i).padStart(2,'0')}`),
+      post({timestamp:'2026-10-13T10:00:00.000',id:`page-${String(i).padStart(2,'0')}`}));
+    await batch.commit();
+  });
+  const base=query(collection(user(),'masjids/a/questions'),orderBy('timestamp','desc'),orderBy('__name__','desc'));
+  const {startAfter}=await import('firebase/firestore');
+  const first=await getDocs(query(base,limit(31)));
+  assert.equal(first.size,31);
+  const cursor=first.docs[29];
+  const second=await getDocs(query(base,startAfter(cursor.data().timestamp,cursor.id),limit(31)));
+  const ids=new Set([...first.docs.slice(0,30),...second.docs].map(d=>d.id));
+  assert.equal(ids.size,36); // 35 equal-time posts plus the pre-seeded post.
+  assert.equal(second.docs[0].id,first.docs[30].id);
+});
+
+
+test('bounded manager pending queue is queried independently of approved history', async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    const batch = writeBatch(db);
+    for(let i=0;i<35;i++) batch.set(doc(db, `masjids/a/events/history-${i}`), {status:'approved',eventDate:'2026-01-01',createdByUid:'imam'});
+    batch.set(doc(db,'masjids/a/events/proposal'),{status:'pending',eventDate:'2026-12-01',createdByUid:'member'});
+    await batch.commit();
+  });
+  const pending = await assertSucceeds(getDocs(query(collection(user('imam'),'masjids/a/events'),where('status','==','pending'),orderBy('eventDate'),limit(31))));
+  assert.deepEqual(pending.docs.map(doc=>doc.id),['proposal']);
+  await assertFails(getDocs(query(collection(env.unauthenticatedContext().firestore(),'masjids/a/events'),where('status','==','pending'),orderBy('eventDate'),limit(31))));
 });

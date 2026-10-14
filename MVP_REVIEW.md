@@ -47,3 +47,8 @@ No production data was deleted and no rules were deployed during this review. Cu
 Phase 1 authorization and approval workflows are implemented locally. Phase 2 now includes reauthentication, retryable Firestore cleanup, member review UI, verified event proposals, real event IDs, and private pending-event rules. All 27 emulator rule tests and 6 Flutter model tests pass; Flutter analysis is clean. These are local checks, not staging or device acceptance.
 
 Deletion cleans the currently implemented collections: UID-attributed questions and their comments, authored comments/events, masjid requests, and the profile, followed by Auth deletion. Incoming comments on a deleting author's posts are blocked to avoid a cleanup race. Managers and super-admins require a reviewed transfer/revocation first. Legacy content without creator UIDs cannot be safely attributed automatically; production migration must review it. Event attendance registration is absent and deferred for this MVP. No rules, indexes, administrator claims, or production data were changed remotely.
+
+
+## Follow-up implementation — 14 October
+
+The initial findings above remain historical. Phase 3 now includes bounded feeds/comments, pending-event queries, explicit comment cleanup, real filtering, draft recovery, bundled assets, and factual settings/privacy. Release signing no longer uses the debug key; application identity/signing and device acceptance remain open. See [launchplan.md](launchplan.md) and [UI QA evidence](scripts/qa/UI_QA.md). Local validation passes 31 rules cases and 10 Flutter tests with clean analysis and an ARM64 debug build. No production deployment or device acceptance was performed.

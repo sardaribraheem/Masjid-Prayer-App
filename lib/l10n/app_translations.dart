@@ -7,6 +7,68 @@ class AppTranslations {
 
   static const Map<String, Map<String, String>> _translations = {
     'en': {
+      'email_label': 'Email',
+      'show_password': 'Show password',
+      'hide_password': 'Hide password',
+      'forgot_password': 'Forgot password?',
+      'reset_enter_email': 'Enter your account email above first.',
+      'reset_sent':
+          'If an account uses this email, a reset link has been sent. Check your inbox and spam folder.',
+      'reset_failed': 'Could not send a reset link. Please try again.',
+      'approved': 'Approved',
+      'events_empty_detail': 'Try another filter or create an event.',
+      'event_time_invalid': 'End time must be after the start time.',
+      'settings_preferences': 'Preferences',
+      'settings_management': 'Masjid management',
+      'settings_support': 'Help & support',
+      'settings_account': 'Account',
+      'sign_out': 'Sign out',
+      'verification_request': 'Request verification',
+      'verification_pending': 'Verification pending',
+      'verification_submitted': 'Verification request sent.',
+      'open_discussion': 'Open discussion',
+      'delete_content': 'Delete',
+      'delete_post_confirm': 'Delete this post and its comments?',
+      'privacy_updated': 'Updated 13 October 2026',
+      'privacy_account_title': 'Your account',
+      'privacy_account_body':
+          'We store your name, account email, masjid association, verification requests, and role permissions in Firebase. Passwords are handled by Firebase Authentication and are not stored in community documents.',
+      'privacy_community_title': 'Community posts and events',
+      'privacy_community_body':
+          'Community text posts, comments, and approved events can be read by guests. Pending event proposals are limited to their author and authorized managers. Hiding your display name does not hide your account ID in the stored post. Attendance registration is not available in this MVP.',
+      'privacy_location_title': 'Optional location',
+      'privacy_location_body':
+          'Location permission is optional. When you choose to use it, your device location is used to sort nearby masjids. You can select a masjid by name without granting location access.',
+      'privacy_retention_title': 'Storage and retention',
+      'privacy_retention_body':
+          'Content remains until it is deleted by its author, an authorized moderator, or through account cleanup. This app does not automatically archive or expire posts. Firebase may cache previously loaded content on your device.',
+      'privacy_deletion_title': 'Deleting your account',
+      'privacy_deletion_body':
+          'Settings lets you reauthenticate and delete your profile, posts and comments attributed to your account ID, event proposals, masjid requests, and authentication account. An interrupted cleanup may partly complete; retry to finish. Masjid managers must arrange a reviewed transfer first. Contact support for older content that has no account ID.',
+      'privacy_contact_title': 'Questions or deletion support',
+      'privacy_contact_body':
+          'Contact sardaribraheem277@gmail.com through Help & Support in Settings.',
+      'sunrise': 'Sunrise',
+      'sunset': 'Sunset',
+      'load_more': 'Load more',
+      'clear': 'Clear search',
+      'post_anonymously': 'Hide my display name',
+      'events_nav': 'Events',
+      'choose_masjid_heading': 'Your masjid, your community',
+      'choose_masjid_subtitle':
+          'Choose a masjid for prayer times and local updates.',
+      'use_location': 'Use my location',
+      'location_optional': 'Location is optional. You can search by name.',
+      'prayer_unavailable': 'Prayer times are not set yet',
+      'prayer_unavailable_detail':
+          'Your imam can add the timetable. Please check back later.',
+      'feed_error': 'Could not load updates. Please try again.',
+      'community_subtitle':
+          'Share a hadith, ayat, or question with your community.',
+      'icon_attribution': 'Icons by Streamline · Nova · CC BY 4.0',
+      'anonymous_display_note':
+          'Hides your name in the feed. Your account ID remains in the stored post.',
+      'no_comments': 'No comments yet. Start the conversation.',
       'review_members': 'Review member verification',
       'no_pending_members': 'No pending member requests.',
       'verification_review_failed':
@@ -300,6 +362,67 @@ class AppTranslations {
       'december': 'December',
     },
     'ur': {
+      'email_label': 'ای میل',
+      'show_password': 'پاس ورڈ دکھائیں',
+      'hide_password': 'پاس ورڈ چھپائیں',
+      'forgot_password': 'پاس ورڈ بھول گئے؟',
+      'reset_enter_email': 'پہلے اوپر اپنے اکاؤنٹ کی ای میل درج کریں۔',
+      'reset_sent':
+          'اگر اس ای میل کا اکاؤنٹ موجود ہے تو ری سیٹ لنک بھیج دیا گیا ہے۔ اپنا ان باکس اور اسپیم فولڈر دیکھیں۔',
+      'reset_failed': 'ری سیٹ لنک نہیں بھیجا جا سکا۔ دوبارہ کوشش کریں۔',
+      'approved': 'منظور شدہ',
+      'events_empty_detail': 'دوسرا فلٹر منتخب کریں یا تقریب بنائیں۔',
+      'event_time_invalid': 'اختتام کا وقت آغاز کے بعد ہونا چاہیے۔',
+      'settings_preferences': 'ترجیحات',
+      'settings_management': 'مسجد کا انتظام',
+      'settings_support': 'مدد اور سپورٹ',
+      'settings_account': 'اکاؤنٹ',
+      'sign_out': 'لاگ آؤٹ',
+      'verification_request': 'تصدیق کی درخواست دیں',
+      'verification_pending': 'تصدیق زیرِ التوا ہے',
+      'verification_submitted': 'تصدیق کی درخواست بھیج دی گئی۔',
+      'open_discussion': 'کھلی گفتگو',
+      'delete_content': 'حذف کریں',
+      'delete_post_confirm': 'یہ پوسٹ اور اس کے تبصرے حذف کریں؟',
+      'privacy_updated': 'تجدید: 13 اکتوبر 2026',
+      'privacy_account_title': 'آپ کا اکاؤنٹ',
+      'privacy_account_body':
+          'آپ کا نام، ای میل، مسجد سے تعلق، تصدیق کی درخواستیں اور اجازتیں Firebase میں محفوظ ہوتی ہیں۔ پاس ورڈ Firebase Authentication سنبھالتا ہے؛ کمیونٹی کی دستاویزات میں پاس ورڈ محفوظ نہیں ہوتے۔',
+      'privacy_community_title': 'کمیونٹی کی پوسٹس اور ایونٹس',
+      'privacy_community_body':
+          'کمیونٹی کی تحریری پوسٹس، تبصرے اور منظور شدہ ایونٹس مہمان بھی پڑھ سکتے ہیں۔ زیرِ التوا تجاویز صرف مصنف اور مجاز منتظم دیکھ سکتے ہیں۔ نام چھپانے سے محفوظ پوسٹ میں اکاؤنٹ کی شناخت نہیں چھپتی۔ اس ورژن میں حاضری کا اندراج دستیاب نہیں۔',
+      'privacy_location_title': 'اختیاری مقام',
+      'privacy_location_body':
+          'مقام کی اجازت اختیاری ہے۔ اجازت دینے پر آلہ کا مقام قریبی مساجد کی ترتیب کے لیے استعمال ہوتا ہے۔ مقام کی اجازت کے بغیر نام سے مسجد منتخب کر سکتے ہیں۔',
+      'privacy_retention_title': 'محفوظ کرنا اور برقرار رکھنا',
+      'privacy_retention_body':
+          'مواد مصنف، مجاز منتظم یا اکاؤنٹ کی صفائی کے ذریعے حذف ہونے تک برقرار رہتا ہے۔ پوسٹس خودکار طور پر ختم یا آرکائیو نہیں ہوتیں۔ Firebase پہلے دیکھا ہوا مواد آلے پر محفوظ رکھ سکتا ہے۔',
+      'privacy_deletion_title': 'اکاؤنٹ حذف کرنا',
+      'privacy_deletion_body':
+          'ترتیبات میں دوبارہ تصدیق کے بعد پروفائل، اکاؤنٹ کی شناخت سے منسلک پوسٹس و تبصرے، ایونٹ تجاویز، مسجد کی درخواستیں اور اکاؤنٹ حذف کر سکتے ہیں۔ عمل رکنے پر دوبارہ کوشش کریں۔ مسجد کے منتظم پہلے ذمہ داری منتقل کروائیں۔ شناخت کے بغیر پرانے مواد کے لیے سپورٹ سے رابطہ کریں۔',
+      'privacy_contact_title': 'سوالات یا حذف کرنے میں مدد',
+      'privacy_contact_body':
+          'ترتیبات میں مدد اور سپورٹ کے ذریعے sardaribraheem277@gmail.com سے رابطہ کریں۔',
+      'sunrise': 'طلوعِ آفتاب',
+      'sunset': 'غروبِ آفتاب',
+      'load_more': 'مزید دیکھیں',
+      'clear': 'تلاش صاف کریں',
+      'post_anonymously': 'میرا نام چھپائیں',
+      'events_nav': 'ایونٹس',
+      'choose_masjid_heading': 'آپ کی مسجد، آپ کی کمیونٹی',
+      'choose_masjid_subtitle':
+          'نماز کے اوقات اور مقامی معلومات کے لیے مسجد منتخب کریں۔',
+      'use_location': 'میرا مقام استعمال کریں',
+      'location_optional': 'مقام اختیاری ہے۔ نام سے تلاش کر سکتے ہیں۔',
+      'prayer_unavailable': 'نماز کے اوقات ابھی مقرر نہیں',
+      'prayer_unavailable_detail':
+          'آپ کے امام اوقات مقرر کر سکتے ہیں۔ بعد میں دوبارہ دیکھیں۔',
+      'feed_error': 'معلومات لوڈ نہیں ہو سکیں۔ دوبارہ کوشش کریں۔',
+      'community_subtitle': 'اپنی کمیونٹی میں حدیث، آیت یا سوال شیئر کریں۔',
+      'icon_attribution': 'آئیکنز: Streamline · Nova · CC BY 4.0',
+      'anonymous_display_note':
+          'فیڈ میں نام چھپاتا ہے۔ محفوظ پوسٹ میں اکاؤنٹ کی شناخت موجود رہتی ہے۔',
+      'no_comments': 'ابھی کوئی تبصرہ نہیں۔ گفتگو شروع کریں۔',
       'review_members': 'ارکان کی تصدیق کا جائزہ',
       'no_pending_members': 'ارکان کی کوئی زیرِ التوا درخواست نہیں۔',
       'verification_review_failed':

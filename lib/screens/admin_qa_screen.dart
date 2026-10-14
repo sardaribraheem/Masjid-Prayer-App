@@ -60,6 +60,9 @@ class _AdminQAScreenState extends State<AdminQAScreen> {
         authProvider.currentUser?.canManageMasjid(AppData.selectedMasjid?.id) !=
             true) {
       return Scaffold(
+        appBar: AppBar(
+          title: Text(appLocalization.t(AppStrings.qnaManagementTitle)),
+        ),
         body: Center(
           child: Text(appLocalization.t('manager_approval_required')),
         ),
@@ -68,10 +71,28 @@ class _AdminQAScreenState extends State<AdminQAScreen> {
     final questions = _getFilteredQuestions();
 
     return Scaffold(
+      bottomNavigationBar: context.watch<QuestionProvider>().hasMore
+          ? SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: OutlinedButton(
+                  onPressed: context.watch<QuestionProvider>().loadingMore
+                      ? null
+                      : context.read<QuestionProvider>().loadMore,
+                  child: Text(appLocalization.t('load_more')),
+                ),
+              ),
+            )
+          : null,
       appBar: AppBar(
         title: Text(appLocalization.t(AppStrings.qnaManagementTitle)),
-        backgroundColor: ColorPalette.primary,
-        elevation: 2,
+        actions: [
+          IconButton(
+            tooltip: appLocalization.t(AppStrings.refresh),
+            onPressed: _loadQuestions,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -109,7 +130,14 @@ class _AdminQAScreenState extends State<AdminQAScreen> {
 
           // Questions List
           Expanded(
-            child: context.watch<QuestionProvider>().isLoading
+            child: context.watch<QuestionProvider>().error != null
+                ? EmptyState(
+                    icon: Icons.cloud_off_outlined,
+                    title: appLocalization.t('feed_error'),
+                    actionLabel: appLocalization.t(AppStrings.refresh),
+                    onAction: _loadQuestions,
+                  )
+                : context.watch<QuestionProvider>().isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : questions.isEmpty
                 ? EmptyState(
@@ -142,113 +170,103 @@ class _AdminQAScreenState extends State<AdminQAScreen> {
     );
   }
 
-  /// Show dialog to answer a question
-  void _showAnswerDialog(BuildContext context, Question question) {
-    final answerController = TextEditingController(text: question.answer ?? '');
-
-    showDialog(
+  /// Save before closing so failed writes preserve the answer draft.
+  Future<void> _showAnswerDialog(
+    BuildContext context,
+    Question question,
+  ) async {
+    final controller = TextEditingController(text: question.answer ?? '');
+    final provider = context.read<QuestionProvider>();
+    final masjidId = question.masjidId;
+    bool saving = false;
+    String? error;
+    await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(appLocalization.t(AppStrings.answerQuestion)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Question display
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: ColorPalette.info,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, update) => PopScope(
+          canPop: !saving,
+          child: AlertDialog(
+            title: Text(appLocalization.t(AppStrings.answerQuestion)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(question.questionText),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: controller,
+                    enabled: !saving,
+                    minLines: 3,
+                    maxLines: 6,
+                    maxLength: 4000,
+                    decoration: InputDecoration(
+                      labelText: appLocalization.t(AppStrings.yourAnswer),
+                    ),
+                  ),
+                  if (error != null)
                     Text(
-                      '${appLocalization.t(AppStrings.questionFrom)} ${question.userName}',
+                      error!,
                       style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.6),
+                        color: Theme.of(context).colorScheme.error,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      question.questionText,
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  ],
-                ),
+                ],
               ),
-              const SizedBox(height: 16),
-
-              // Answer field
-              Text(
-                appLocalization.t(AppStrings.yourAnswer),
-                style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            actions: [
+              TextButton(
+                onPressed: saving ? null : () => Navigator.pop(context, false),
+                child: Text(appLocalization.t(AppStrings.cancel)),
               ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: answerController,
-                maxLines: 6,
-                decoration: InputDecoration(
-                  hintText: appLocalization.t(AppStrings.typeYourAnswerHere),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+              ElevatedButton(
+                onPressed: saving
+                    ? null
+                    : () async {
+                        final text = controller.text.trim();
+                        if (text.isEmpty) {
+                          update(
+                            () => error = appLocalization.t(
+                              AppStrings.pleaseEnterAnAnswer,
+                            ),
+                          );
+                          return;
+                        }
+                        update(() {
+                          saving = true;
+                          error = null;
+                        });
+                        final success = await provider.answerQuestion(
+                          masjidId,
+                          question.id,
+                          text,
+                        );
+                        if (!context.mounted) return;
+                        if (success) {
+                          Navigator.pop(context, true);
+                        } else {
+                          update(() {
+                            saving = false;
+                            error = appLocalization.t('feed_error');
+                          });
+                        }
+                      },
+                child: Text(
+                  appLocalization.t(
+                    saving ? 'submitting' : AppStrings.saveAnswer,
                   ),
                 ),
               ),
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(appLocalization.t(AppStrings.cancel)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final provider = context.read<QuestionProvider>();
-              final navigator = Navigator.of(context);
-              final messenger = ScaffoldMessenger.of(context);
-
-              if (answerController.text.trim().isEmpty) {
-                messenger.showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      appLocalization.t(AppStrings.pleaseEnterAnAnswer),
-                    ),
-                  ),
-                );
-                return;
-              }
-
-              await provider.answerQuestion(
-                AppData.selectedMasjid?.id ?? '',
-                question.id,
-                answerController.text.trim(),
-              );
-
-              if (!mounted) return;
-              messenger.showSnackBar(
-                SnackBar(
-                  content: Text(appLocalization.t(AppStrings.answerSaved)),
-                  backgroundColor: ColorPalette.success,
-                ),
-              );
-
-              navigator.pop();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ColorPalette.primary,
-            ),
-            child: Text(appLocalization.t(AppStrings.saveAnswer)),
-          ),
-        ],
       ),
     );
+    // Route disposal is asynchronous; release the controller after its fields
+    // leave the tree rather than during the dismissal transition.
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    controller.dispose();
   }
 }
 
@@ -268,48 +286,11 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? ColorPalette.primary
-              : Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected
-                ? ColorPalette.primary
-                : Theme.of(context).colorScheme.outline,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color: isSelected
-                  ? Theme.of(context).colorScheme.onPrimary
-                  : Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.6),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected
-                    ? Theme.of(context).colorScheme.onPrimary
-                    : Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.6),
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return ChoiceChip(
+      label: Text(label),
+      avatar: Icon(icon, size: 18),
+      selected: isSelected,
+      onSelected: (_) => onTap(),
     );
   }
 }
@@ -408,7 +389,7 @@ class _QuestionCard extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: ColorPalette.info,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
@@ -440,7 +421,7 @@ class _QuestionCard extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: ColorPalette.success,
+                  color: Theme.of(context).colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
@@ -479,7 +460,7 @@ class _QuestionCard extends StatelessWidget {
                       : appLocalization.t(AppStrings.answerQuestion),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: ColorPalette.primary,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),

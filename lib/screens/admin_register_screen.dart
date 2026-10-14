@@ -201,7 +201,6 @@ class _AdminRegisterScreenState extends State<AdminRegisterScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(appLocalization.t(AppStrings.registerNewMasjid)),
-        backgroundColor: ColorPalette.tertiary,
         elevation: 0,
       ),
       body: Padding(
@@ -221,7 +220,10 @@ class _AdminRegisterScreenState extends State<AdminRegisterScreen> {
               const SizedBox(height: 8),
               Text(
                 appLocalization.t(AppStrings.createAdminAccount),
-                style: const TextStyle(fontSize: 14, color: Colors.grey),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 30),
@@ -263,8 +265,10 @@ class _AdminRegisterScreenState extends State<AdminRegisterScreen> {
                 controller: emailController,
                 enabled: !isLoading,
                 keyboardType: TextInputType.emailAddress,
+                autofillHints: const [AutofillHints.email],
+                autocorrect: false,
                 decoration: InputDecoration(
-                  labelText: 'Email',
+                  labelText: appLocalization.t('email_label'),
                   hintText: 'admin@masjid.com',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),

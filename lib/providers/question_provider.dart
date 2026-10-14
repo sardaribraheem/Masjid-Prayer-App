@@ -13,6 +13,12 @@ class QuestionProvider extends ChangeNotifier {
   List<Question> _questions = [];
   bool _isLoading = false;
   String? _error;
+  int _generation = 0;
+  String? _masjidId;
+  bool _hasMore = false;
+  bool _loadingMore = false;
+  bool get hasMore => _hasMore;
+  bool get loadingMore => _loadingMore;
 
   List<Question> get questions => _questions;
   bool get isLoading => _isLoading;
@@ -32,13 +38,24 @@ class QuestionProvider extends ChangeNotifier {
 
   /// Load questions from Firestore for a specific masjid
   Future<void> loadQuestions(String masjidId) async {
+    final generation = ++_generation;
+    _masjidId = masjidId;
+    _streamSub?.cancel();
+    _loadingMore = false;
+    _questions = [];
+    _hasMore = false;
+    _error = null;
     _isLoading = true;
     notifyListeners();
 
     try {
-      _questions = await _repository.getQuestions(masjidId);
+      final page = await _repository.getQuestions(masjidId);
+      if (generation != _generation) return;
+      _hasMore = page.length > 30;
+      _questions = page.take(30).toList();
       _error = null;
     } catch (e) {
+      if (generation != _generation) return;
       _error = e.toString();
     }
 
@@ -50,16 +67,29 @@ class QuestionProvider extends ChangeNotifier {
   /// (tab switching recreates pages) and returns the new subscription so the
   /// caller can cancel it in dispose().
   StreamSubscription<List<Question>> subscribeToQuestions(String masjidId) {
+    final generation = ++_generation;
+    _masjidId = masjidId;
+    _questions = [];
+    _hasMore = false;
+    _loadingMore = false;
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
     _streamSub?.cancel();
     final sub = _repository
         .getQuestionsStream(masjidId)
         .listen(
           (questions) {
-            _questions = questions;
+            if (generation != _generation) return;
+            _questions = questions.take(30).toList();
+            _hasMore = questions.length > 30;
+            _isLoading = false;
             _error = null;
             notifyListeners();
           },
           onError: (Object error) {
+            if (generation != _generation) return;
+            _isLoading = false;
             _error = error.toString();
             notifyListeners();
           },
@@ -68,8 +98,39 @@ class QuestionProvider extends ChangeNotifier {
     return sub;
   }
 
+  Future<void> loadMore() async {
+    if (_loadingMore || !_hasMore || _masjidId == null || _questions.isEmpty) {
+      return;
+    }
+    // Older pages are a point-in-time view. Stop the head listener while
+    // browsing them so a new head snapshot cannot silently discard pages.
+    _streamSub?.cancel();
+    final generation = _generation;
+    _loadingMore = true;
+    notifyListeners();
+    try {
+      final page = await _repository.getQuestions(
+        _masjidId!,
+        after: _questions.last,
+      );
+      if (generation != _generation) return;
+      _hasMore = page.length > 30;
+      final ids = _questions.map((item) => item.id).toSet();
+      _questions.addAll(page.take(30).where((item) => !ids.contains(item.id)));
+      _error = null;
+    } catch (error) {
+      if (generation == _generation) _error = error.toString();
+    } finally {
+      if (generation == _generation) {
+        _loadingMore = false;
+        notifyListeners();
+      }
+    }
+  }
+
   @override
   void dispose() {
+    _generation++;
     _streamSub?.cancel();
     super.dispose();
   }
@@ -113,6 +174,15 @@ class QuestionProvider extends ChangeNotifier {
     return success;
   }
 
+  Future<bool> deleteQuestion(String masjidId, String questionId) async {
+    final success = await _repository.deleteQuestion(masjidId, questionId);
+    if (success) {
+      _questions.removeWhere((q) => q.id == questionId);
+      notifyListeners();
+    }
+    return success;
+  }
+
   /// Answer a question
   Future<bool> answerQuestion(
     String masjidId,
@@ -127,6 +197,18 @@ class QuestionProvider extends ChangeNotifier {
     if (success) {
       // Also update AppData for backward compatibility
       AppData.answerQuestion(questionId, answer);
+      final index = _questions.indexWhere(
+        (question) =>
+            question.id == questionId && question.masjidId == masjidId,
+      );
+      if (index != -1) {
+        _questions[index] = Question.fromJson({
+          ..._questions[index].toJson(),
+          'answer': answer,
+          'isAnswered': true,
+        });
+        notifyListeners();
+      }
     }
     return success;
   }
