@@ -10,7 +10,7 @@ Alerts use Android local exact alarms, the phone's IANA timezone, and the select
 
 `test/prayer_reminders_test.dart` adds 28 tests covering lead offsets, unique slots, Friday substitution/fallback, midnight/year/DST rollover, invalid times, legacy/default/corrupt preference handling, persistence, opt-in and denied permissions, replacing mosque/time/lead schedules, rapid changes, partial native failure rollback, missing pending IDs, storage errors, revocation, restart restoration, unsupported platforms, test-alarm isolation, and English/Urdu custom validation at 320px. Native calls use a fake boundary; these tests do not establish OS delivery.
 
-`playwright-reminder-qa.js` passes 6 local browser assertions. The current source also builds an ARM64 debug APK at `build/app/outputs/flutter-apk/app-debug.apk` (14 October, 17:22 PKT). Compilation passed after clearing generated caches when disk exhaustion interrupted earlier attempts. No Android installation or actual alarm delivery was verified.
+`playwright-reminder-qa.js` passes 6 local browser assertions. The ARM64 debug APK at `build/app/outputs/flutter-apk/app-debug.apk` (14 October, 17:22 PKT) builds and was subsequently installed on the owner's Android 14 phone. One controlled background notification delivered at 17:47:58.065 PKT; see [device evidence](ANDROID_DEVICE_QA.md). This does not verify tap navigation, sound, reboot, actual daily/Friday delivery or signed-release behavior.
 
 ## Required Android checks
 

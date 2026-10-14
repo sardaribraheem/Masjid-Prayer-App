@@ -1,43 +1,50 @@
 # Masjid Prayer App
 
-Flutter Android MVP for masjid communities, using Firebase Authentication, Firestore, Provider, and English/Urdu with RTL support. The app provides masjid selection, prayer times, approved events, text-only community posts and comments, member verification, and scoped imam management.
+Flutter Android app for local masjid communities: mosque selection, congregation prayer times, approved events, text-only community posts/comments, and scoped imam management. Firebase Authentication and Firestore store accounts and community data. Provider manages app state; English, Urdu and RTL are supported.
 
-Read [app_guide.md](app_guide.md) for installation/development commands, guest/member/imam workflows, mosque registration requirements, reminders, data storage and owner approval instructions.
+**Public launch: HOLD as of 14 October 2026.** Production still uses older email-based Firestore rules. Local fixes are not deployed. Final Android identity/signing, remaining device acceptance, timetable-editor fixes and community moderation controls are also pending.
 
-## Launch status
+## Start here
 
-The current implementation has local Flutter, security-emulator, browser QA, and limited [Android device evidence](scripts/qa/ANDROID_DEVICE_QA.md). Broader device/signed-release acceptance and production migration remain pending. [launchplan.md](launchplan.md) records phase progress, and [MVP_REVIEW.md](MVP_REVIEW.md) retains the initial findings. See [UI QA](scripts/qa/UI_QA.md) for the latest checks and limits.
-
-Android is the only launch target. The final application ID remains pending; the existing registration is `com.example.masjid_app`. Release signing, reviewed production role migration, rules/index deployment, and real-device acceptance remain release gates. See [Android release instructions](scripts/qa/ANDROID_RELEASE.md).
-
-Optional local Android prayer reminders are implemented: default 15 minutes, presets including 20 minutes, or a custom 1–60 minute lead for the selected masjid. Friday uses Jummah instead of Dhuhr when set. Reminders are off until the user enables them and grants notification/alarm permissions. They use the phone timezone and last saved timetable; reopen the app to refresh changes. One Android 14 background test delivers on time; reboot, broader delivery and signed-release acceptance remain pending. See [reminder QA](scripts/qa/PRAYER_REMINDERS.md). No Storage uploads or paid server scheduler are added.
-
-Attendance registration remains deferred. Google sign-in UI is disabled unless `ENABLE_GOOGLE_SIGN_IN=true`; enable it only after OAuth configuration and device verification. Community attachments and uploads are excluded. Anonymous posting hides the display name; stored author UIDs remain readable.
-
-**Production security blocker:** a read-only audit on 14 October retrieved the older deployed email-based rules, last updated 16 September. They do not match the locally tested rules or current client workflows. Reviewed grants/migration, administrator bootstrap, rules/index deployment, and staging verification are required before launch. See [production audit](scripts/qa/PRODUCTION_AUDIT.md).
+| Document | Purpose |
+| --- | --- |
+| [app_guide.md](app_guide.md) | Run the app; guest, muqtaddi and imam workflows; registration requirements; data storage |
+| [launchplan.md](launchplan.md) | Ordered technical gates, mosque pilot, outreach, operations and revenue experiments |
+| [FINALTODO.md](FINALTODO.md) | Current requirement status and deferred scope |
+| [MVP_REVIEW.md](MVP_REVIEW.md) | Current risks and the evidence needed to close them |
+| [FIREBASE_SETUP.md](FIREBASE_SETUP.md) | Local Firebase configuration and safe emulator setup |
+| [CLAUDE.md](CLAUDE.md) | Architecture and contributor briefing; also read [AGENTS.md](AGENTS.md) |
+| [UI QA](scripts/qa/UI_QA.md) | Local test commands and browser verification limits |
+| [Android device QA](scripts/qa/ANDROID_DEVICE_QA.md) | Actual phone observations and remaining acceptance checks |
+| [Android release gate](scripts/qa/ANDROID_RELEASE.md) | Application ID, signing and store prerequisites |
+| [Production audit](scripts/qa/PRODUCTION_AUDIT.md) | Confirmed deployed-rule gaps and migration sequence |
 
 ## Development
-
-Read `AGENTS.md`, `CLAUDE.md`, `FINALTODO.md`, and `launchplan.md` before changes.
 
 ```sh
 flutter pub get
 flutter analyze
 flutter test
 flutter run # connected Android device
-flutter build apk --debug --target-platform android-arm64
 ```
 
-Provide the project's Android `google-services.json` locally; it is ignored by Git. Android startup uses the native configuration. Other native targets have placeholder Dart options and are not launch targets. Poppins fonts and Streamline icons are bundled for offline rendering; [asset attribution](assets/README.md) and the font license accompany them.
+Provide `android/app/google-services.json` locally; Git ignores it. Android startup uses native Firebase configuration. The existing application ID is `com.example.masjid_app`; the final ID remains an owner decision. Android is the only launch target. Web is retained for emulator/browser QA; other Flutter platform scaffolds are not release commitments.
 
-For browser QA, use the isolated local demo emulators described in [UI QA](scripts/qa/UI_QA.md). Do not seed fixtures into production. [Security test instructions](test/firestore/README.md) and [trusted administrator bootstrap/migration](scripts/admin/README.md) are separate from visual QA.
+For isolated QA, follow [UI QA](scripts/qa/UI_QA.md) and [rules tests](test/firestore/README.md). Fixtures are restricted to the local `demo-masjid-rules` emulators. Never seed production. Production rules/index deployment, administrator grants and publication require a separately reviewed, authorized operation.
 
-## Authorization and data lifecycle
+## Product boundaries
 
-New accounts are ordinary members. Approved verification controls event proposals; publication requires manager approval unless the member has an explicit full grant. Imam access requires a reviewed assignment and a protected masjid grant. Super-admin access requires the server-issued `superAdmin` claim; email addresses grant no privileges. UI checks supplement Firestore rules.
+- **Events** uses `CommunityPage`; **Community** uses `QuestionsPage`. Posts, questions, ayat/hadith text and comments have no attachment/upload controls.
+- New accounts are ordinary members. Imam access requires approval, a matching mosque assignment and its protected manager UID grant. Super-admin access requires the server-issued `superAdmin` claim; email addresses grant no privileges in the reviewed source rules.
+- Optional local Android reminders start off. Users choose 5, 10, 15, 20, 30 or 60 minutes, or custom 1–60 minutes. Friday uses Jummah when set. Alerts use phone timezone and the last saved timetable; reopening refreshes edits. One Android 14 background test passed; reboot, revocation and signed-release acceptance remain open.
+- Attendance, media uploads, automatic expiry, payments and multi-mosque management are deferred. Google sign-in is hidden unless explicitly enabled and configured.
+- Feeds/comments paginate by 30. Search applies to loaded pages. The mosque directory still loads all mosques and needs review before expansion.
+- Anonymous posting hides a display name, while stored author UIDs remain readable. Deletion cleans UID-attributed data and can require retry after interruption; managers need reviewed transfer/revocation.
 
-Posts and events load in pages of 30 with a lookahead document; comments load on demand with older-page navigation. Older pages are snapshots; Refresh reconnects to the newest feed. Event text/category search and community answer filters apply to loaded pages. The manager's pending-event queue is queried separately from approved history.
+Bundled fonts and navigation icons support offline rendering. Keep [asset attribution](assets/README.md) and the font license. The launcher source PNG is retained for the existing icon-generation configuration; its final branding, resolution and usage rights require release review.
 
-Post deletion freezes replies, deletes child comments in batches, then deletes the post. Account deletion requires recent authentication, freezes contributions, removes UID-attributed content and profile, then deletes Auth. Interrupted cleanup is retryable and may partially complete. Managers require reviewed transfer/revocation; legacy content without creator UIDs needs migration. No automatic archival or expiry is promised.
+## Cleanup policy
 
-Production deployments must pair reviewed rules, indexes, migration, and compatible app behavior. Local tests do not establish deployed Firebase behavior. Do not deploy or publish implicitly during code review.
+The obsolete session log, duplicate `latesttodo.md`, unsafe Firebase helper and 27 old tracked Playwright snapshots were removed on 14 October. Useful requirements now live in FINALTODO; current risks and execution steps live in MVP_REVIEW and launchplan. Earlier document versions remain in Git history.
+
+Keep source, platform tooling, lockfiles, licenses, security tests and QA procedures. Build output and temporary browser captures stay ignored. The current debug APK is local test output, not a release artifact.

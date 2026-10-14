@@ -7,7 +7,7 @@ import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
 import 'muqtaddi_register_screen.dart';
 
-/// Login screen for normal Muqtaddis (`latesttodo.md` §2, §10).
+/// Login screen for normal Muqtaddis.
 ///
 /// Uses the AuthProvider's Firestore-backed role flow: after Firebase Auth
 /// sign-in, `hydrateUser` loads the authoritative `users/{uid}` document so

@@ -1,31 +1,33 @@
-# UI and local acceptance evidence — 14 October 2026
+# Local UI and acceptance evidence
 
-This pass uses Streamline MCP for the bundled Nova icons and Playwright MCP against a Flutter web preview connected to local Firebase Auth/Firestore emulators. The launch target remains Android. Browser QA and a debug APK do not establish signed Android behavior or deployed Firebase rules.
+Updated 14 October 2026. Android is the launch target. Browser checks use a debug Flutter web preview connected to local Auth/Firestore emulators. Local tests, browser screenshots and a debug APK do not establish deployed authorization or signed Android acceptance.
 
-**Later 14 October reminder pass:** clean analysis, 38 Flutter tests and 35 rules cases now pass. `playwright-reminder-qa.js` passes 6 assertions for the 20-minute preset, rejection of custom 61, custom 17 and its persistence after reload, Android-only browser status, and Urdu controls; the Urdu picker was visually inspected at 320×740 after reload. A provider subscription placement issue caught during this pass was corrected. Actual Android reminder delivery remains pending. [Production audit](PRODUCTION_AUDIT.md) confirms deployed rules still differ from the tested local rules and block public launch. The table below records the earlier UI pass, not native acceptance of the new reminders.
+## Recorded results
 
-The new reminder Android build initially failed because this workstation ran out of disk space. After clearing generated project caches, abandoned Gradle downloads and the obsolete downloaded Gradle 8.12 distribution, `flutter build apk --debug --target-platform android-arm64` passed. The refreshed APK is `build/app/outputs/flutter-apk/app-debug.apk` (90,840,181 bytes; built 14 October at 17:22 PKT). This verifies compilation/packaging, not installation, native delivery or release signing.
+These results come from separate 14 October passes. The 29 core browser assertions predate the reminder pass; they were not all rerun together against a signed release. No production deployment was performed.
 
-**Connected-device follow-up:** the same APK was subsequently installed successfully on the owner's Android 14 phone without clearing app data. Startup, native English/dark prayer/settings screens, saved custom 33-minute lead, 35 weekly alarms, Friday Jummah metadata and disabled-state cancellation were observed. A controlled one-minute test posted a real Android notification at 17:47:58.065 PKT while the app was in the background. See [ANDROID_DEVICE_QA.md](ANDROID_DEVICE_QA.md) for exact evidence and remaining limits. This supersedes the earlier lack of device evidence for these specific checks only.
+The documentation cleanup reran Flutter analysis (clean) and all 38 Flutter tests (passed). Relative Markdown links/code fences and comment-only Dart changes were checked. Rules, browser suites and device scenarios were not rerun for this cleanup; their results below are prior recorded evidence. Required launcher-source and icon-catalog PNGs previously hidden by a broad ignore rule are retained in Git.
 
-## Verified locally
-
-| Check | Evidence |
+| Check | Recorded evidence / limit |
 | --- | --- |
-| Flutter static analysis | No issues found |
-| Flutter tests | 10 passed: permission/model tests and prayer parsing/countdown edge cases |
-| Firestore security | 31 emulator cases passed, including self-promotion denial, private proposals, text constraints, deletion races, cursor ties, and a pending queue independent of approved history |
-| Android compilation | Current source builds an ARM64 debug APK; no signed release or installation |
-| Browser compilation | Static debug web preview builds with `USE_FIREBASE_EMULATORS=true` |
-| Repeatable browser flow | `playwright-smoke.js` passes 17 assertions for guest/event filtering, reset requests, login, posting, comments, parent/child deletion, older replies, verification, proposals, and manager approval |
-| Failure and account acceptance | `playwright-account-qa.js` passes 12 assertions: denied event draft retained/retried, immediate answer refresh, failed reauthentication safety, profile/content/Auth cleanup, and guest return |
-| Visual/manual browser checks | 390×844 and 320×640, plus signup at 320×400; prayer/community light and dark; English/Urdu labels and RTL; settings, masjid selection and wrapping; older post navigation; manager answer/event forms; successful signup returns directly to the signed-in app |
+| Flutter analysis | No issues found |
+| Flutter tests | 38 passed: original model/prayer cases plus 28 reminder cases |
+| Firestore rules | 35 emulator cases passed; role denial, scoped grants/approval, schema bounds, private proposals and deletion behavior |
+| Core browser flows | `playwright-smoke.js`: 17 assertions; `playwright-account-qa.js`: 12 assertions |
+| Reminder browser flows | `playwright-reminder-qa.js`: 6 assertions for preset/custom validation, persistence, unsupported-platform status and Urdu controls |
+| Browser visual checks | Scoped light/dark and English/Urdu RTL at 390×844 and 320×640; signup at 320×400; reminder picker at 320×740 |
+| Owner prayer adjustment | Separate cards, opposing name/time alignment and Material time-of-day icons inspected in English/light and Urdu/dark |
+| Android compilation | ARM64 debug APK built 14 October at 17:22 PKT, 90,840,181 bytes; no signed release |
+| Actual phone | Same APK installed without clearing data on one Android 14 phone; native startup and English/dark screens, custom lead persistence, 35 weekly slots and disable cancellation observed |
+| Background notification | One-minute test posted at 17:47:58.065 PKT while app was in background; tap, sound, reboot and daily/Friday delivery not verified |
 
-Playwright snapshots and screenshots were inspected during the pass; temporary evidence is ignored under `.playwright-mcp/`. Browser errors caught during development were corrected, including an obscured checkbox ink surface, stale answer cards, dark-button contrast, collapsed offscreen comment state, and an event error placed outside the accessible form content.
+See [device evidence](ANDROID_DEVICE_QA.md), [reminder acceptance](PRAYER_REMINDERS.md) and the [production audit](PRODUCTION_AUDIT.md). The production audit confirmed the active older rules differ from the tested source.
+
+The core browser suite covers guest/event filtering, reset requests, login, posts/comments, parent/child cleanup, older replies, verification/proposals/manager approval, failed-save draft recovery, answer refresh, failed reauthentication safety and local profile/content/Auth cleanup. It is scoped acceptance, not every form/error/device state.
 
 ## Repeat the local checks
 
-Use JDK 21 for the Firestore emulator. On this Mac the Android Studio bundled JBR supplies it. Start the local services in separate terminals:
+Run Flutter analysis/tests from the root. Use Java 21+ for the Firestore emulator; this Mac has Android Studio's JBR at `/Applications/Android Studio.app/Contents/jbr/Contents/Home`. Start the local services in separate terminals:
 
 ```sh
 firebase emulators:start --project demo-masjid-rules --only firestore,auth --config firebase.emulator.json
@@ -35,28 +37,23 @@ flutter build web --debug --no-wasm-dry-run --dart-define=USE_FIREBASE_EMULATORS
 python3 -m http.server 7360 --bind 127.0.0.1 --directory build/web
 ```
 
-The seed script has hardcoded localhost demo endpoints. `--reset` clears that isolated demo database, then creates labeled fixtures, an ordinary member, and a demo imam. It does not accept a production project or endpoint. The public test password is only for these local accounts. Rules tests reset their demo database; seed afterward.
+Install test dependencies first if needed: `npm ci --prefix test/firestore`. Rules tests reset their demo database; seed afterward. The seed script accepts only its hardcoded localhost demo endpoints. `--reset` deletes/recreates isolated fixtures; never point it at production. Demo passwords are public local-test credentials.
 
-Navigate Playwright to **http://localhost:7360/**. Use `browser_run_code_unsafe` with `filename: "scripts/qa/playwright-smoke.js"`. Run `playwright-account-qa.js` afterward; it tests denied-write recovery, answering, reauthentication failure, and complete local account cleanup. The scripts use emulator-only owner REST reads to verify records; app writes still use the actual signed-in client and rules. The recovery test temporarily removes only the demo manager grant and restores it in `finally`.
+Navigate Playwright to `http://localhost:7360/`. Use `browser_run_code_unsafe` with `filename: "scripts/qa/playwright-smoke.js"`, then the account script and reminder script as appropriate. Emulator-only owner REST reads check records; actual app writes use the signed-in client/rules. The account recovery test temporarily removes a demo grant and restores it in `finally`.
 
-Flutter's editable semantics names change when fields gain focus. The scripts use sequential typing after focus settles. Lazy scrolling requires wheel gestures before selecting controls in older pages. The red Firebase emulator warning is removed only from the QA browser to avoid covering navigation; normal builds do not enable emulator mode.
+Flutter editable semantics change on focus; scripts type sequentially after focus settles. Older-page controls can require scrolling before lookup. The red emulator warning is removed only from the QA browser to avoid covering navigation. Normal builds do not enable emulator mode.
 
-## Remaining release acceptance
+## Open acceptance
 
-- No Android device was connected (`flutter devices` found macOS and Chrome). Actual soft-keyboard, font fallback, accessibility scaling, permissions, offline/reconnect, restart persistence, and native authentication still need device checks.
-- Password-reset delivery/templates are not tested by an emulator OOB request.
-- Complete cleanup with injected interruption, Auth deletion failure, retry after restart, legacy UID-less content, and manager transfer still needs staging/device acceptance.
-- The emulator does not validate production index availability, existing grants, quotas, or deployment. Review legacy roles/UID attribution and trusted super-admin bootstrap before rules/app rollout.
-- Final application ID and owner-controlled signing remain pending. Release builds require ignored signing configuration and never use the debug key. Flutter reports future Gradle/AGP/Kotlin support warnings; the debug build currently succeeds.
-- Location-denied and missing-native-configuration behavior needs actual Android acceptance. A previously selected masjid lookup is time-bounded to avoid an indefinite network wait at startup.
-- Category/text and answer filters apply to loaded feed pages. Load more extends those results. Refresh returns to the newest listener; older pages are point-in-time snapshots.
-- Notification scheduling and attendance registration remain outside the Spark MVP. No automatic content expiry is promised.
+- Final ID, owner signing, Firebase/OAuth registration and a signed candidate: [Android release gate](ANDROID_RELEASE.md).
+- Timetable editor unset-time/partial-save defects and public report/block/terms flows: [current review](../../MVP_REVIEW.md).
+- Native small-screen keyboard, large text, complete Urdu/light/dark forms, accessibility, optional location denied, offline/reconnect and restart/auth switching.
+- Password-reset email delivery/templates; an emulator out-of-band request is not real mail delivery.
+- Interrupted cleanup, Auth deletion failure, restart/retry, legacy unattributed data and manager transfer in staging/device acceptance.
+- Reminder actual daily/Friday alerts, reboot, revocation, Doze/OEM battery, tap and signed delivery: [checklist](PRAYER_REMINDERS.md).
+- Actual deployed indexes/rules/grants, migration compatibility, quota and performance. Browser/emulator success does not certify production.
+- Hosted privacy/deletion resources, community moderation, accurate store disclosures and required Play Console testing: [launch plan](../../launchplan.md).
 
-No production Firebase rules, indexes, claims, data, or store releases were deployed in this pass.
+Filters search loaded pages; older pages are snapshots. No attendance or automatic expiry is promised. Optional reminders are implemented locally and have limited native evidence.
 
-Password recovery uses the documented [Firebase Flutter API](https://firebase.google.com/docs/auth/flutter/manage-users#send_a_password_reset_email). See [asset licensing](../../assets/README.md) and [Android release gate](ANDROID_RELEASE.md).
-
-
-## Prayer-page follow-up
-
-A small owner-requested visual adjustment restores individual prayer cards, name/time alignment at opposite edges (mirrored in Urdu), and Material dawn/sun/afternoon/moon icons. The next-prayer card is slightly smaller and omits a zero-hour countdown segment. Clean analysis and all 10 Flutter tests pass. Playwright screenshots were inspected at 390×844 English/light and 320×640 Urdu/dark with no Flutter console errors. This follow-up does not change Firestore rules or establish Android device acceptance.
+Temporary Playwright captures stay ignored. The 27 stale tracked snapshots were removed during documentation cleanup; repeatable scripts and useful evidence summaries remain. Keep [asset attribution](../../assets/README.md). Password recovery follows the [Firebase Flutter API](https://firebase.google.com/docs/auth/flutter/manage-users#send_a_password_reset_email).

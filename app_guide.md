@@ -256,7 +256,7 @@ Once the reviewed backend/claim setup is ready:
 
 Existing privileged users/grants must be audited before deployment; never bulk-trust old role/email values. Current approved managers assigned elsewhere require a reviewed handover before another mosque assignment.
 
-For public release, complete the [launch plan](launchplan.md): reviewed production migration and rules/index deployment, final Android application ID/Firebase registration, owner-controlled signing, staging acceptance and remaining device checks. Production deployment is a separate authorized action, not something running this guide automatically performs.
+For public release, complete the [launch plan](launchplan.md): timetable-editor fixes and public community moderation, reviewed production migration and rules/index deployment, final Android application ID/Firebase registration, owner-controlled signing, staging/native acceptance and store setup. Confirm entered prayer times against the mosque noticeboard; the current editor's unset-time/default and separate Friday-save behavior are open issues in [MVP_REVIEW.md](MVP_REVIEW.md). Production deployment is a separate authorized action, not something running this guide automatically performs.
 
 ## 11. Common problems
 

@@ -31,4 +31,4 @@ Keep existing ISO-string post/event ordering until a reviewed migration; silentl
 3. Review [firestore.rules](../../firestore.rules) and [firestore.indexes.json](../../firestore.indexes.json) as a coordinated deployment with the migrated grants and app. Obtain explicit deployment authorization; this review does not deploy them.
 4. Retrieve deployed rules again, compare the reviewed source, verify indexes and actual staging/production acceptance, monitor Spark usage, and record evidence in [launchplan.md](../../launchplan.md).
 
-The core UI is ready for a small usability pilot. Public release still requires this backend sequence, final Android identity/signing, device reminder delivery, offline/restart/deletion failure acceptance, and store metadata.
+The UI has scoped local usability evidence, and one controlled Android debug background reminder delivered. A real-user pilot still requires compatible backend activation and the correctness/moderation gates in [launchplan.md](../../launchplan.md). Public release additionally requires final Android identity/signing, remaining native/reminder acceptance and store readiness.

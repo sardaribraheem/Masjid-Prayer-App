@@ -1,82 +1,51 @@
-# Masjid Prayer App — Project Briefing
+# Masjid App contributor briefing
 
-> **IMPORTANT**: Before modifying anything, read `CLAUDE.md` and `FINALTODO.md`, then inspect **ONLY** the relevant files for the current task. Do not read the entire codebase.
+Updated 14 October 2026. Read [AGENTS.md](AGENTS.md), this file, [FINALTODO.md](FINALTODO.md) and [launchplan.md](launchplan.md) before changes. Inspect task-relevant files and preserve existing work.
 
-## 1. Overview & Vision
-- **App**: Masjid Prayer App for the Hassan Masjid community and general deployment.
-- **Goal**: Allow users to select a masjid, view prayer times, browse/propose community events, ask questions answered by imams/admins, request verification, and manage settings (dark mode, English/Urdu, RTL). Admins/imams manage prayer times, events, Q&A, and verification requests.
-- **Tech Stack**: Flutter 3.44.x, Dart (^3.10.0), Firebase (Auth + Firestore), Local state (`shared_preferences` + Provider/ChangeNotifier), optional local Android prayer reminders.
-- **Firebase Project**: `masjid-prayer-app-49f50` (`lib/firebase_options.dart` for web; `google-services.json` for Android).
+## Product and current state
 
-## 2. Architecture & File Structure
+Android-only MVP for local mosque timetables, approved events, text-only community posts/comments, member verification and imam management. English/Urdu, RTL and light/dark modes must remain supported. Preserve the owner's restrained prayer layout: separate prayer cards, names and times at opposite edges, and familiar time-of-day icons.
 
-### Navigation & Screens
-- **Entry (`main.dart`)**: Initializes localization, storage, Firebase; routes to `MainNavigationScreen` or `MasjidSelectionScreen`.
-- **Main Navigation Shell (`screens/main_navigation_screen.dart`)**: 4-tab bottom navigation shell:
-  1. `PrayerPage` (`screens/prayer_page.dart`) — Tab 1: Prayer times + live countdown.
-  2. `CommunityPage` (`screens/community_page.dart`) — Tab 2: Community events/posts/feed.
-  3. `QuestionsPage` (`screens/questions_page.dart`) — Tab 3: Ask questions & view answers.
-  4. `SettingsPage` (`screens/settings_page.dart`) — Tab 4: Profile, masjid, prefs, admin panel, about.
-- **Admin & Auth Screens**:
-  - `AdminLoginScreen` (`screens/admin_login_screen.dart`)
-  - `AdminPanelScreen` (`screens/admin_panel_screen.dart`)
-  - `AdminQAScreen` (`screens/admin_qa_screen.dart`)
-  - `AdminEventsScreen` (`screens/admin_events_screen.dart`)
-  - `AdminRegisterScreen` (`screens/admin_register_screen.dart`)
-  - `MuqtaddiLoginScreen` (`screens/muqtaddi_login_screen.dart`)
-  - `MuqtaddiRegisterScreen` (`screens/muqtaddi_register_screen.dart`)
-  - `AskQuestionScreen` (`screens/ask_question_screen.dart`)
-  - `EditProfileScreen` (`screens/edit_profile_screen.dart`)
-  - `ClaimMasjidScreen` (`screens/claim_masjid_screen.dart`)
-  - `SuperAdminDashboard` (`screens/super_admin_dashboard.dart`)
+**Public release remains on hold.** The deployed backend uses older rules; source rules passing locally do not protect production. See [MVP_REVIEW.md](MVP_REVIEW.md) and the [production audit](scripts/qa/PRODUCTION_AUDIT.md). Final application ID/signing, remaining Android acceptance, timetable-editor correctness and public community moderation are open gates.
 
-### Models (`models/`)
-- `app_data.dart`: Defines `Masjid`, `PrayerTime`, `Question`, `Event`, `User`, `UserRole`, `ClaimRequest`, and static global state `AppData`.
+## Architecture
 
-### Services (`services/`)
-- `firebase_service.dart`: Singleton for Firestore CRUD, streams, queries.
-- `storage_service.dart`: Singleton for `shared_preferences` persistence.
-- `location_service.dart`: Geolocator wrapper.
+| Area | Main files / responsibility |
+| --- | --- |
+| Startup | `lib/main.dart`; initializes preferences, localization, Firebase and selected mosque |
+| Navigation | `lib/screens/main_navigation_screen.dart`; Time, Events, Community, Settings |
+| Prayer | `prayer_page.dart`, `admin_panel_screen.dart`; display and manager editing |
+| Events | `community_page.dart`, event provider/repository, manager events screen |
+| Community | `questions_page.dart`, question provider/repository; posts, answers and comments |
+| Accounts | Auth provider; muqtaddi/admin login and registration; edit profile; account deletion service |
+| Mosque onboarding | Claim screen/provider/repository and super-admin dashboard |
+| Models/cache | `lib/models/app_data.dart`; Firestore is the source of truth, AppData is a client cache |
+| Persistence | Firebase service; local storage service; settings/location providers |
+| Reminders | Prayer reminder provider/services and Android native notification configuration |
+| Localization/theme | `lib/l10n/`, `lib/theme/`, bundled fonts/icons |
 
-### Repositories (`repositories/`)
-- `question_repository.dart`: `masjids/{id}/questions`
-- `event_repository.dart`: `masjids/{id}/events`
-- `masjid_repository.dart`: `masjids` + `claimRequests`
+`CommunityPage` is the Events tab. `QuestionsPage` is the Community tab. Do not introduce photo/video attachments or Storage uploads.
 
-### Providers (`providers/`)
-- `auth_provider.dart`: FirebaseAuth state & role mapping.
-- `question_provider.dart`: Question list + stream subscription.
-- `event_provider.dart`: Event list + stream subscription.
-- `masjid_provider.dart`: Masjid list, filtering, selection, distance sort.
-- `masjid_claim_provider.dart`: Masjid claims & registrations.
-- `location_provider.dart`: GPS state.
-- `settings_provider.dart`: Dark mode / language persistence.
-- `prayer_reminder_provider.dart`: Optional local Android reminder preferences, permission recovery and timetable synchronization. Actual device delivery acceptance remains open.
+## Authorization and data
 
-## 3. Role & Permission Model
-- **UserRole Enum**: `guest` → `muqtaddi` → `verifiedMuqtaddi` → `imam` → `admin` (Ultimate Admin).
-- **Enforcement**: Backend security (`firestore.rules`) strictly prevents self-promotion, self-verification, and unauthorized masjid management.
+Ordinary muqtaddi, mosque-verified muqtaddi and imam/admin are distinct roles, not a client-controlled promotion ladder. Member verification and event permissions are separate from Firebase email verification. A manager needs an imam/admin role, the assigned `masjidId`, and membership in that mosque's protected `authorizedImamUids`. Super-admin access uses a trusted Auth custom claim. Never grant privileges by email or editable profile fields.
 
-## 4. Firestore Collections & Security
-- `masjids/{id}`
-- `masjids/{id}/questions/{qid}`
-- `masjids/{id}/events/{eid}`
-- `claimRequests/{id}`
-- `users/{uid}`
-- **Security Rules**: [`firestore.rules`](firestore.rules) enforces auth token claims, role checks, and prevents privilege escalation.
+Source rules enforce these boundaries; the deployed policy currently does not match them. Changes must include server rules as well as UI constraints. Follow [trusted bootstrap/migration](scripts/admin/README.md); never bulk-trust legacy elevated roles.
 
-## 5. Localization & Theming
-- **Localization**: Key-based manual localization via `AppLocalization` singleton (`l10n/app_localization.dart`), `AppStrings` (`l10n/app_strings.dart`), and EN/UR maps (`l10n/app_translations.dart`). RTL supported via `Directionality`.
-- **Theming**: `ColorPalette` constants & light/dark `ThemeData` (`theme/app_theme.dart`).
+Paths: `users/{uid}`, `claimRequests/{id}`, `masjids/{id}`, mosque `events/{id}`, `questions/{id}` and question `comments/{id}`. Preserve current ISO-string post/event ordering until an explicit migration. Public anonymity is limited to display-name hiding. Account/post deletion can partially complete and must remain retryable.
 
-## 6. Development Workflow & Commands
-```bash
+Firebase project: `masjid-prayer-app-49f50`. Android uses the ignored native `google-services.json`; web options are in `lib/firebase_options.dart`. Other native Dart options remain placeholders. The production Firestore database is in `asia-south1`; this does not establish the region of every Firebase service.
+
+## Verification and workflow
+
+```sh
 flutter pub get
-flutter run -d chrome
 flutter analyze
-firebase deploy --only firestore:rules
+flutter test
 ```
 
-## 7. What NOT to Touch Unnecessarily
-- Do not modify core localization maps or routing structure unless required by an explicit checklist task in `FINALTODO.md`.
-- Do not re-introduce fake sample data seeding in production (`FirebaseService.initializeSampleData`).
+Use the explicit demo project and local emulators for fixtures: [rules tests](test/firestore/README.md), [browser QA](scripts/qa/UI_QA.md). Recorded local evidence: clean analysis, 38 Flutter tests, 35 rules cases, 29 core browser assertions plus 6 reminder assertions. These cover different passes; they are not production acceptance.
+
+The current ARM64 debug APK installs on one Android 14 phone and a one-minute notification delivered in the background. Keep reboot, Doze/OEM battery, revocation, daily/Friday delivery, tap navigation and signed-artifact checks open: [device evidence](scripts/qa/ANDROID_DEVICE_QA.md), [reminder checklist](scripts/qa/PRAYER_REMINDERS.md).
+
+Do not implicitly deploy rules/indexes, change production claims/data, or publish a release. Keep signing credentials outside Git. No production sample seeding, plaintext passwords, client-only authorization or unsupported completion claims. Retain asset licenses. Attendance and payments remain deferred.

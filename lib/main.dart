@@ -42,8 +42,8 @@ void main() async {
   await firebaseService.initialize();
 
   // NO anonymous sign-in: a signed-out user is a guest who can read public
-  // data (masjids) and must register/login as a Muqtaddi to write
-  // (`latesttodo.md` §1, §2). Auth state is handled by AuthProvider.
+  // data (masjids) and must register/login as a Muqtaddi to write.
+  // Auth state is handled by AuthProvider.
 
   // Check if a masjid was previously selected
   final selectedId = storageService.getSelectedMasjidId();

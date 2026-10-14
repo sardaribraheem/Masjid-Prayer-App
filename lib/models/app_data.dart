@@ -1,6 +1,6 @@
 /// User role enumeration for role-based access control.
 ///
-/// Mirrors `latesttodo.md` §3 — there are two separate tracks:
+/// Membership verification and mosque management are separate tracks:
 ///   Normal Muqtaddi → Verification Request → Verified Muqtaddi
 ///        (event approval-required OR full event permission)
 /// and separately: Imam / Admin.
@@ -29,7 +29,7 @@ enum UserRole {
   }
 }
 
-/// Verification status of a muqtaddi (`latesttodo.md` §2).
+/// Mosque membership verification status of a muqtaddi.
 /// `none`      — not applied (default for new accounts)
 /// `pending`   — verification requested, awaiting admin/imam review
 /// `approved`  — verified muqtaddi
@@ -55,7 +55,7 @@ enum VerificationStatus {
   }
 }
 
-/// Event-posting permission for a verified muqtaddi (`latesttodo.md` §3).
+/// Event-posting permission for a verified muqtaddi.
 /// Kept separate from verification: being verified does NOT grant any of
 /// these automatically.
 enum EventPermission {
@@ -436,7 +436,7 @@ class Question {
   }
 }
 
-/// Publication status of an event (`latesttodo.md` §3/§8).
+/// Publication status of an event.
 /// Only `approved` events are publicly visible.
 enum EventStatus {
   pending,
@@ -601,7 +601,7 @@ class Event {
 ///
 /// NOTE: `AppData` is a static cache. Firebase is the single source of truth;
 /// these lists are hydrated from Firestore and must NOT contain hardcoded
-/// sample data (`latesttodo.md` §1).
+/// sample data.
 class AppData {
   static Masjid? selectedMasjid; // Which masjid the user selected
   static List<Masjid> allMasjids = []; // List of all masjids in the system

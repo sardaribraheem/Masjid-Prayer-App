@@ -8,14 +8,14 @@ import '../services/account_deletion_service.dart';
 
 /// Provides authentication state and operations using Firebase Auth.
 ///
-/// Email/password is the PRIMARY path for normal Muqtaddis (`latesttodo.md`
-/// §2, §10). There is NO anonymous fallback: a signed-out user is a guest who
+/// Email/password is the primary path for normal Muqtaddis.
+/// There is no anonymous fallback: a signed-out user is a guest who
 /// can read public data but must register/log in to write.
 ///
 /// Roles (`role`, `verificationStatus`, `eventPermission`) are read from the
 /// Firestore `users/{uid}` document. A newly registered user is a plain
 /// `muqtaddi` — verification and permissions can only be granted by an
-/// admin/imam, not self-assigned (`§9`).
+/// authorized manager, not self-assigned.
 class AuthProvider extends ChangeNotifier {
   final auth.FirebaseAuth _firebaseAuth = auth.FirebaseAuth.instance;
   final firestore.FirebaseFirestore _firestore =
@@ -182,8 +182,8 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Register a new normal Muqtaddi account with email and password
-  /// (`latesttodo.md` §2). Creates the Firebase Auth user AND a Firestore
+  /// Register a new normal Muqtaddi account with email and password.
+  /// Creates the Firebase Auth user and a Firestore
   /// `users/{uid}` document with role = muqtaddi (never anything higher).
   Future<bool> registerWithEmail({
     required String email,
@@ -237,7 +237,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Sign in with email and password (`latesttodo.md` §2, §10).
+  /// Sign in with email and password.
   Future<bool> signInWithEmail(String email, String password) async {
     _isLoading = true;
     _error = null;

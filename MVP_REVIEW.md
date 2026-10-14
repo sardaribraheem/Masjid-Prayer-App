@@ -1,56 +1,44 @@
-# MVP review — 8 October 2026
+# MVP readiness review
 
-**Live work tracker:** [launchplan.md](launchplan.md). The findings below describe the initial baseline; implementation status is recorded there.
+Updated 14 October 2026. **Decision: HOLD public launch.** The app has useful local implementation and limited phone evidence, but the deployed backend and public-release requirements do not yet support a safe, reliable launch. Use [launchplan.md](launchplan.md) for execution and [FINALTODO.md](FINALTODO.md) for requirements.
 
-**Current verdict — 14 October: hold public launch.** A read-only audit now confirms production still uses the older email-based authorization rules, last updated 16 September. It lacks current comment, approval, guest-read, and cleanup permissions. See [production audit](scripts/qa/PRODUCTION_AUDIT.md) for confirmed findings and the reviewed deployment sequence. Final Android identity/signing and broader device acceptance remain open. Optional configurable prayer reminders are implemented, locally tested, and pass one controlled Android 14 background-delivery test; see [device evidence](scripts/qa/ANDROID_DEVICE_QA.md). Reboot and signed-release acceptance remain pending.
+## Current blockers
 
-Initial source review, not a complete security audit or production verification. Existing uncommitted changes were preserved. Target launch: 15 October 2026 if “in a week” remains the plan.
+| Priority | Finding and evidence | Required closure |
+| --- | --- | --- |
+| P0 | Production still serves the older email-based rules. Read-only audit retrieved the release updated 16 September; it differs from source and lacks current comments, scoped approvals and cleanup permissions. | Independently review legacy grants/data, bootstrap the trusted claim, test migration in staging, authorize coordinated rules/index/client rollout, then retrieve and test deployed policy. [Audit](scripts/qa/PRODUCTION_AUDIT.md) |
+| P0 | Imam editor maps unset/invalid prayer times to noon, supplies a default Friday time, mutates the selected model before persistence, and ignores the separate Friday write result. Source: `_initializeTimes`, `_parseTimeString`, `handleSave` in [admin_panel_screen.dart](lib/screens/admin_panel_screen.dart). | Require intentional valid selections, save the timetable coherently and report failures accurately. Test a newly approved empty timetable and denied/failed saves; do not advertise example values as verified congregation times. |
+| P0 for public community | Posting-policy acceptance, in-app report-content/report-user and user blocking were not found in current client/rules. Manager delete controls alone do not complete public community moderation. | Add localized flows, protected/bounded reports, blocking and a staffed review process. Verify behavior and follow [Google Play UGC policy](https://support.google.com/googleplay/android-developer/answer/9876937?hl=en). |
+| P0 for store release | Application ID remains `com.example.masjid_app`; final ID/signing are pending. There is no certified signed candidate. | Owner confirms identity and controls signing; verify matching Firebase/OAuth registration and signed artifact. [Release gate](scripts/qa/ANDROID_RELEASE.md) |
+| P0 for store release | In-app privacy/deletion exist, but public privacy and deletion-request resources and store disclosures have not been verified. | Publish working resources, check real deletion support, complete accurate Data safety/store setup. [Google Play user-data policy](https://support.google.com/googleplay/android-developer/answer/10144311?hl=en) and [deletion guidance](https://support.google.com/googleplay/android-developer/answer/13327111?hl=en) |
+| P1 | Reminder background test passed on one Android 14 debug device; reboot, revocation, daily/Friday delivery, tap navigation, OEM/Doze and signed behavior remain open. | Run and record [reminder acceptance](scripts/qa/PRAYER_REMINDERS.md) on the signed candidate; explain observed device restrictions. |
+| P1 | Native keyboard/RTL/accessibility/offline/auth restart and cleanup-interruption coverage is incomplete. | Complete staging/device matrix; retry after partial cleanup, verify manager handover and legacy UID-less contributions. |
 
-## Launch blockers
+## Operational risks before expansion
 
-1. **Critical: self-assigned imam and arbitrary masjid access.** `firestore.rules` allows creating one's user document with role `imam`, approved verification, and full event permission. Self-updates also allow changing `masjidId`. Together these let an attacker become a manager of an existing masjid. Replace this with trusted approval/assignment and lock manager associations. Super-admin authorization relies on an email string without checking email verification; migrate to trusted claims or an immutable server-managed grant. Resolve registration compatibility before deploying a role-policy fix.
-2. **Account deletion leaves personal data.** `AuthProvider.deleteAccount` swallows Firestore deletion failures, and the rules have no user-document delete permission. Auth deletion can succeed while the user document remains; posts and event participation are not cleaned up. Build a reliable deletion/anonymization workflow including reauthentication and partial-failure recovery.
-3. **Verification and event proposals conflict with rules.** User updates cannot change verification status, managers cannot read other user documents, and events can only be created by managers. Checklist claims for member verification and member proposals are not established by these rules.
-4. **Android release setup unfinished.** `android/app/build.gradle.kts` uses `com.example.masjid_app` and debug signing for release. Decide the final application ID and configure release signing before store delivery.
-5. **Notification feature absent.** Settings persist a boolean; no notification scheduling package or scheduling implementation is present. Remove the promise/toggle or implement and device-test it. FINALTODO item 12's completion claim is unsupported.
+- The mosque directory is an unbounded read. Content feeds/comments paginate, but filter/search applies to loaded pages. Measure usage and loading behavior before growing the directory.
+- Current valid post/event ordering uses client-provided ISO dates. A reviewed migration is needed before changing timestamp types; do not mix types silently.
+- No production load/concurrency or abuse-rate acceptance has been completed. Text limits constrain individual documents, not how many requests an attacker can make. Define usage monitoring and abuse response before opening wider signup.
+- Anonymous mode hides a display name, not the stored author UID. Privacy and user expectations must remain explicit.
+- Registration currently needs name/location and account details, not uploaded documents or a map pin. Committee identity/authority is checked manually; request progress/contact/Urdu-name UI is incomplete.
+- An earlier requirement called for Firebase verified-email posting. Current posting accepts signed-in members; mosque verification is a different concept. Resolve the product decision explicitly before release.
+- Retention, automatic expiry, attendance and payments are not implemented release features. Do not include them in marketing.
+- Launcher source is only 48×48; confirm final icon quality/usage rights and splash/store branding before submission.
 
-## Other findings
+## What the evidence establishes
 
-- Guests are told they can read community content, but question/event read rules require authentication. Align the promised behavior and rules.
-- QuestionProvider and the repository load the complete post history; comments are capped but posts still need pagination. Initial screens also do a one-shot fetch plus a listener.
-- Comment display currently shows only the newest 30; older-comment pagination and moderation/delete controls need a follow-up. Deleting a post does not recursively delete its comment subcollection.
-- Publicly readable post documents include author UIDs even for anonymous posts. Anonymity is a display choice, not backend identity secrecy.
-- Privacy policy claims automatic content archival/removal, but FINALTODO says retention is incomplete. Correct the policy to match implementation.
-- Events' Upcoming/Nearby/All buttons change selected state but do not affect filtering in CommunityPage.
-- Native Firebase setup and release builds need target-device verification. README describes platform placeholders; documentation and checklists disagree about completion.
-- Existing test coverage is a small set of model tests, not security-rule or end-to-end coverage.
+| Evidence | Result / limit |
+| --- | --- |
+| Local Flutter | Clean analysis; 38 tests, including 28 reminder tests. No deployed authorization claim. |
+| Local Firestore | 35 emulator cases covering allowed/denied roles, text/schema bounds, approval privacy and cleanup. No production index/grant/latency certification. |
+| Browser | 29 core assertions plus 6 reminder assertions in separate demo-emulator passes; scoped EN/UR and small-screen visual checks. No signed native acceptance. |
+| Android debug | Current ARM64 APK builds and installs with existing device data preserved. One one-minute notification posted at 17:47:58.065 PKT in the background. No reboot/tap/signed acceptance. |
+| Production | Read-only rules audit and Firestore `asia-south1` location lookup. No rules, claims, indexes or data were changed. |
 
-## Changes in this review
+Detailed evidence: [UI QA](scripts/qa/UI_QA.md), [device QA](scripts/qa/ANDROID_DEVICE_QA.md), [production audit](scripts/qa/PRODUCTION_AUDIT.md).
 
-- Added AGENTS.md project guidance for future sessions.
-- Removed community image/video URL entry and previews. New question serialization excludes media fields; legacy attachments are hidden, not destroyed. Separate event media behavior remains unchanged.
-- Added text comments under `masjids/{id}/questions/{id}/comments`, loaded only when opened. Requires signed-in posting, a server timestamp, and bounded text via local rules.
-- Fixed post document IDs in repository reads and writes so answers/comments target actual documents.
-- Removed subscription creation from QuestionsPage.build; added stream error handling. Failed posts retain their draft and posting is disabled during submission.
-- Added post length validation and creator UID/schema enforcement in local rules.
+## Findings corrected locally since the initial review
 
-## Before release
+Ordinary-member imam applications and transactional approval; claim-based super-admin and protected manager grants; text-only community/comment schemas; paginated feeds/comments; private event proposals; retryable UID-attributed deletion; accurate settings/privacy; bundled fonts/icons; password recovery; optional configurable local reminders. These are source improvements with scoped local evidence, not proof that production has changed.
 
-Prioritize role authorization and deletion, then verify registration/verification/event workflows against Firebase emulators and staging. Test two users plus imam/admin and denied operations. Test community posting, comments, empty/long text, retries, keyboard layout, Urdu/RTL, account switching, and masjid switching on the target devices. Configure release identity/signing, run a release build, and make documentation/privacy claims accurate. Deploy reviewed rules only after verification.
-
-No production data was deleted and no rules were deployed during the initial review. Production rules were not retrieved in that initial pass; the 14 October read-only audit linked above supersedes that verification limit.
-
-## Local validation
-
-`flutter analyze`: no issues. `flutter test`: all 6 tests passed. `git diff --check`: passed. No Firebase emulator, production round-trip, or device UI testing was performed in this pass.
-
-## Follow-up implementation — 8 October
-
-Phase 1 authorization and approval workflows are implemented locally. Phase 2 now includes reauthentication, retryable Firestore cleanup, member review UI, verified event proposals, real event IDs, and private pending-event rules. All 27 emulator rule tests and 6 Flutter model tests pass; Flutter analysis is clean. These are local checks, not staging or device acceptance.
-
-Deletion cleans the currently implemented collections: UID-attributed questions and their comments, authored comments/events, masjid requests, and the profile, followed by Auth deletion. Incoming comments on a deleting author's posts are blocked to avoid a cleanup race. Managers and super-admins require a reviewed transfer/revocation first. Legacy content without creator UIDs cannot be safely attributed automatically; production migration must review it. Event attendance registration is absent and deferred for this MVP. No rules, indexes, administrator claims, or production data were changed remotely.
-
-
-## Follow-up implementation — 14 October
-
-The initial findings above remain historical. Phase 3 now includes bounded feeds/comments, pending-event queries, explicit comment cleanup, real filtering, draft recovery, bundled assets, and factual settings/privacy. Release signing no longer uses the debug key; application identity/signing and device acceptance remain open. See [launchplan.md](launchplan.md) and [UI QA evidence](scripts/qa/UI_QA.md). Local validation passes 31 rules cases and 10 Flutter tests with clean analysis and an ARM64 debug build. No production deployment or device acceptance was performed.
+This file replaces the stale baseline review and appended session narratives. Git history preserves the original findings. Close risks only with recorded evidence for the relevant environment and artifact.

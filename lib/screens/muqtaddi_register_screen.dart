@@ -6,11 +6,11 @@ import '../l10n/app_localization.dart';
 import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
 
-/// Register screen for normal Muqtaddis (`latesttodo.md` §2).
+/// Register screen for normal Muqtaddis.
 ///
 /// Creates a Firebase Auth account AND a Firestore `users/{uid}` document
 /// with role = `muqtaddi`. Verification/permissions are never self-assigned
-/// here — an admin/imam grants them via the `users/{uid}` doc (§9).
+/// here — an authorized manager grants them through the reviewed workflow.
 class MuqtaddiRegisterScreen extends StatefulWidget {
   const MuqtaddiRegisterScreen({super.key});
 

@@ -49,9 +49,7 @@ android/app/google-services.json
 
 # Playwright MCP temp files
 .playwright-mcp/
-
-# Test/verification screenshots
-*.png
+.playwright-cli/
 
 # Local Firebase rule-test dependencies and emulator output
 node_modules/

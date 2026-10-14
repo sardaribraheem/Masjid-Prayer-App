@@ -17,9 +17,9 @@ class FirebaseService {
 
   FirebaseService._internal();
 
-  /// Initialize Firebase using the platform-specific options defined in
-  /// `lib/firebase_options.dart`. Run `flutterfire configure` to regenerate
-  /// the file with project-specific credentials for android, ios, macos, etc.
+  /// Initialize Firebase from native Android configuration, web options, or
+  /// explicit debug-only local emulator options. Other native launch targets
+  /// require their own reviewed project configuration.
   Future<void> initialize() async {
     if (kReleaseMode && const bool.fromEnvironment('USE_FIREBASE_EMULATORS')) {
       throw StateError('Emulator mode is unavailable in release builds.');

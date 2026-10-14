@@ -257,7 +257,7 @@ class AppTranslations {
       'must_be_unique': 'Must be unique',
       'at_least_6': 'At least 6 characters',
 
-      // Muqtaddi Auth (latesttodo §2, §10)
+      // Muqtaddi authentication
       'muqtaddi_login_title': 'Muqtaddi Login',
       'muqtaddi_register_title': 'Create Account',
       'login_subtitle': 'Sign in to your account',

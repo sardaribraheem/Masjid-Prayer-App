@@ -1,146 +1,119 @@
-# MVP launch plan
+# Masjid App launch and business execution plan
 
-Target: 15 October 2026 (Asia/Karachi). Launch platform: **Android only**, confirmed by the owner. Final Android application ID remains pending. Launch depends on passing the gates below, not reaching the date. This file tracks implementation and evidence; MVP_REVIEW.md records the original findings. Preserve unrelated work already in the checkout.
+Updated 14 October 2026. Android-only MVP; final application ID remains pending. **Public launch is on hold.** Production uses older rules, and release/device/moderation gates remain open. A calendar target cannot override those gates. The former 15 October target can serve as an internal progress review, not a promise of public availability.
 
-Status: **in progress** = work underway; **local verified** = code and local checks pass; **release verified** = staging/device checks also pass. No phase is release verified yet.
+This is the single execution plan. [FINALTODO.md](FINALTODO.md) tracks requirements, [MVP_REVIEW.md](MVP_REVIEW.md) tracks risks, and [app_guide.md](app_guide.md) covers actual user/manager workflows. Proposed business targets below are experiments, not existing traction or revenue.
 
-**Current decision: hold public launch.** A read-only production audit on 14 October confirms Firestore still serves the old email-based rules (release updated 16 September), incompatible with current comments, approval, and cleanup workflows. Final Android identity/signing and device acceptance also remain pending. See [production audit](scripts/qa/PRODUCTION_AUDIT.md). Local source improvements do not repair production until the reviewed migration/deployment is completed.
+## Product and first customer
 
-## Scope decisions
+Start with one local mosque whose imam and committee you can meet and support. The congregation gets the mosque's actual prayer/Jummah timetable, optional advance reminders, approved announcements and a text-only channel for questions. The imam gets one place to update times, answer questions and review event proposals.
 
-- Community posts/comments are text-only. Use existing Firebase Auth + Firestore; do not introduce Storage or a paid backend for the MVP.
-- New imam accounts start as ordinary members and submit approval requests. A trusted super-admin grants management access.
-- Super-admin access comes from a server-issued `superAdmin` custom claim, never an email string or editable user field.
-- A manager must have an imam/admin user role, a matching masjid association, and membership in that masjid's protected `authorizedImamUids` list.
-- Existing anonymous posting hides the display name only; do not promise that other readers cannot discover the author UID.
-- Defer attendance registration for this MVP; source inspection found no persistence or registration UI despite checklist claims. Revisit it after the launch-critical flows work.
-- The owner requested optional prayer reminders on 14 October. Implement the local Android scheduler and user-selected lead time; include it in release only after device delivery/permissions/reboot acceptance. Attendance remains deferred.
-- Do not promise automated archival. Define actual deletion/retention behavior and update privacy text.
+The mosque committee is the onboarding partner and potential future paying customer; congregants are the users. Trust depends on correct local congregation times and a responsive mosque manager. Sunrise/sunset labels must not imply additional congregation prayers. Keep ordinary timetable viewing easy for guests.
 
-## Phase 1 — Authorization and imam onboarding (8–9 October)
+Android, English/Urdu, restrained prayer cards and text-only community stay in scope. Attendance, media uploads, paid scheduling, payments, multi-mosque administration and broad discovery are deferred. Retain the existing local reminders, but complete their acceptance before advertising delivery reliability.
 
-**Status: local verified; staging/migration pending.** Addresses review blocker 1 and imam-onboarding parts of 3.
+## Owners and dependencies
 
-- [x] Reject self-created imam/admin roles, approved verification, and elevated event permission.
-- [x] Prevent users from changing manager associations or granting management via masjid edits.
-- [x] Replace email-only super-admin authorization with a trusted custom claim; provide an explicit bootstrap/migration procedure.
-- [x] Register imam applicants as members with a pending new-masjid request, atomically.
-- [x] Approve requests in a transaction that creates/links the masjid, assigns the user, and marks the request reviewed. Reject repeated approval and missing applicants/masjids.
-- [x] Wire claim provider, dashboard navigation, and reliable role hydration into the app.
-- [x] Run rules emulator tests for authorized and denied operations, Flutter checks, and formatting/diff checks.
+| Work | Responsible party | Concrete output |
+| --- | --- | --- |
+| App/rules fixes and QA | Developer | Reviewed changes, tests, staged acceptance record and release candidate |
+| Identity/signing/store account | App owner | Final application ID, matching Firebase registration, private signing backup, Play Console account status |
+| Privileged access and rollout | Owner + trusted operator | Independently approved manager/admin UIDs, migration/rollback review, explicit deployment authorization |
+| Mosque onboarding | Owner + committee | Authority confirmation, accepted manager, accurate timetable and backup contact |
+| Moderation/support | Named owner + mosque manager | Monitored mailbox/report queue and escalation/response process |
+| Pilot measurement/business decisions | Owner | Cohort notes, usage/cost/support totals and an explicit expand/hold decision |
 
-**Gate:** a member cannot become imam, move a manager grant, edit a different masjid, impersonate a claimant, or obtain super-admin access by email. An approved applicant can manage only the assigned masjid. Approval failures do not leave partial role assignments.
+No messages are sent to committees/testers, no payments are collected, and no production grants/deployments are performed by writing this plan.
 
-**Production prerequisite:** use a trusted Admin SDK environment to grant the known administrator UID `superAdmin: true`. Review existing elevated users and masjid lists before deployment: old rules allowed unauthorized creation. Never bulk-trust every existing role. Test the migration on staging, refresh the administrator's token, then deploy reviewed rules with the compatible app.
+## Phase 1: Finish the remaining app correctness work
 
-## Phase 2 — Account lifecycle and member workflows (9–10 October)
+Status: **planned; existing core implementation has local evidence.**
 
-**Status: core implementation and rules locally verified; client/device acceptance and legacy data migration pending.** Addresses blockers 2 and 3 and account-switching risks.
+1. Fix the imam timetable editor. Unset/invalid times must remain visibly unset; picking must work from that state. Require deliberate valid entries and preserve an optional Friday policy consistent with the prayer/reminder screens. Save prayer/Jummah data coherently; commit local changes only after success. Verify a new empty timetable and failed/denied saves.
+2. Complete public community moderation: EN/UR posting-policy acceptance before contributions, report content/report user, blocking, and a manager/operator review queue. Protect report reads and enforce bounded fields/identity/status transitions in server rules. Verify blocks across refresh/restart and all relevant posts/comments/answers. Manager deletion alone is insufficient for a public community. [Google Play UGC policy](https://support.google.com/googleplay/android-developer/answer/9876937?hl=en)
+3. Resolve the earlier verified-email requirement: current posting is signed-in, not Firebase-email-verified. Either implement the gate and recovery UX or record the owner's explicit scope decision; mosque membership verification remains separate.
+4. Run Flutter analysis/tests and the affected rule/browser tests. Keep required denial/failure scenarios and localized small-screen checks in the evidence.
 
-- [x] Implement a retryable Spark-compatible cleanup: freeze contributions with a deletion marker; remove UID-attributed posts and child comments, authored comments/events, claims, and profile in batches; delete Auth only after cleanup succeeds. Legacy content without creator UIDs requires reviewed migration. Attendance registration is deferred.
-- [x] Require recent authentication before cleanup; support email/password and configured Google sign-in. Surface failed cleanup without a false success message.
-- [x] Handle manager-owned masjids explicitly: revoke access safely or require transfer before account deletion. Do not orphan community administration.
-- [x] Prevent deleted-user records or asynchronous role loads from restoring an old session.
-- [x] Allow a member to request verification for an existing selected masjid without self-approving.
-- [x] Add scoped manager review UI with approve/reject actions; lock protected roles and association fields.
-- [x] Allow eligible verified members to propose pending events; publication requires manager approval unless explicit full permission was granted.
-- [x] Fix event document IDs. Attendance registration is absent; explicitly defer it and remove completion claims. Pending event reads now require author/manager access; approved-event queries are public.
-- [x] Test cleanup ownership/retry, recent-auth restrictions, verification transitions, and pending-event visibility against the emulator.
-- [ ] Run the actual client cleanup with interruption/Auth failures on staging; verify email/password and configured Google reauthentication on Android.
-- [ ] Validate account switching/revocation and profile changes on-device; ensure no private review screen remains visible after logout.
+**Exit gate:** no default/partial-save timetable misinformation; moderation controls work with server permissions; posting eligibility is explicit; all changed behavior passes appropriate local checks. This is not deployed acceptance.
 
-**Gate:** deletion fails visibly and remains retryable until cleanup is complete; verification and event proposals persist with rules enforcing the same permissions as the UI. No privileged account survives an association switch.
+## Phase 2: Prepare and activate the compatible backend
 
-## Phase 3 — Community reliability, cost, and truthful behavior (10–12 October)
+Status: **local source/rules tested; production migration/deployment pending.**
 
-**Status: implemented with local QA; broader device and staging acceptance remains open.** Addresses the remaining feed/privacy findings.
+1. Build a read-only inventory of legacy privileged users, mosque grants, creator attribution, malformed dates/categories and suspected samples. Confirm actual committee authority; never use old document IDs as a deletion list or automatically trust legacy elevated roles.
+2. Prepare a reviewed migration, recovery/rollback procedure and compatible client/rules/index package. Keep ISO-string ordering until a separately reviewed timestamp migration. Retain backups/recovery evidence appropriate to the selected Firebase plan; verify capabilities before relying on them.
+3. Rehearse the migration in a separate staging project with synthetic/labeled staging fixtures, then test ordinary signup, pending imam registration, transactional approval, scoped management, proposal privacy, comments and interrupted/retried cleanup. Test denied self-promotion/cross-mosque writes.
+4. Prepare the trusted `superAdmin` UID bootstrap using [the reviewed procedure](scripts/admin/README.md). Review project/identity/grants before applying; editable emails confer no privileges.
+5. After separate explicit authorization, coordinate production grants/data migration, rules/index deployment and client compatibility. Retrieve the active rules again, compare the reviewed source, verify deployed indexes and actual allowed/denied workflows, and record the evidence. [Current production audit](scripts/qa/PRODUCTION_AUDIT.md)
 
-- [x] Align guest UI and read rules; approved events and community reading must behave as advertised, while private/pending content stays protected.
-- [x] Add bounded post/event queries and pagination without hiding the manager's pending queue.
-- [x] Remove duplicate fetch/listen requests; correctly cancel/resubscribe on user and masjid changes and display stream errors/retries.
-- [x] Add older-comment pagination, author/manager delete controls, and parent-deletion handling. Firestore does not recursively remove subcollections; explicitly handle orphan comments.
-- [x] Community, comment, event, and answer forms disable duplicate submissions and close only after successful saves; failures retain their drafts.
-- [ ] Complete failure/recovery acceptance for profile, imam onboarding, and claims on Android and staging.
-- [x] Make Upcoming/Nearby/All filters change the actual results; remove controls that have no meaningful MVP behavior.
-- [x] Update privacy policy, English/Urdu strings, notification UI, README, and FINALTODO to match tested capabilities.
-- [x] Check browser light/dark, English/Urdu RTL, text-only community controls, and narrow layouts.
-- [ ] Complete actual Android keyboard, long input, restart, offline/reconnect, and accessibility acceptance across every form.
+**Exit gate:** active backend matches reviewed policy; the compatible client works against migrated grants; unauthorized operations fail; recovery/support procedures are usable. Until this passes, demos use emulators/staging and trusted testing only.
 
-**Gate:** no unbounded feed reads, no duplicate listeners after navigation, no inaccessible error states, no orphaned comment promises, and no UI or policy claims for absent features.
+## Phase 3: Create and accept the Android release candidate
 
-## Phase 4 — Release configuration (12–13 October)
+Status: **debug build/device startup and one background reminder test pass; signed acceptance pending.**
 
-**Status: debug build verified; final identity, signing, and device acceptance pending.** Addresses blocker 4 and native configuration.
+1. Owner confirms final application ID and store identity. Register/update the matching Android Firebase app, retain the correct native config locally, and prepare owner-controlled signing backed up outside Git. Review launcher quality/rights, splash, app name and store artwork.
+2. Prepare the release candidate in the reviewed environment after identity/backend prerequisites. Release builds must never use the debug key or emulator configuration. [Android release gate](scripts/qa/ANDROID_RELEASE.md)
+3. Run guest/member/imam/admin acceptance on the signed artifact: correct mosque/times, signup/login/logout/account switching, posting/comments/answers, verification/proposals/approval, persistence, denied permissions, network failure and retryable deletion. Include Urdu RTL, light/dark, small-screen keyboard and large text.
+4. Complete [reminder acceptance](scripts/qa/PRAYER_REMINDERS.md): 15/20/custom lead, actual daily/Friday alerts, app closed, reboot, revocation/recovery, tap navigation, timezone/midnight and battery restrictions. Record expected/actual times on the owner's phone and additional target devices where available.
+5. Publish a public privacy page and a working account-deletion request page; verify the support process without reinstalling the app. Complete accurate Data safety, content rating, target audience, reviewer access and required permission declarations. In-app policy alone does not finish store setup. [User-data policy](https://support.google.com/googleplay/android-developer/answer/10144311?hl=en), [deletion guidance](https://support.google.com/googleplay/android-developer/answer/13327111?hl=en)
+6. Check the actual Play Console account's eligibility. Personal accounts created after 13 November 2023 currently require at least 12 continuously opted-in closed testers for 14 days before applying for production access; application/review follows. This prevents promising a one-week public store launch if that requirement applies. [Official testing requirements](https://support.google.com/googleplay/android-developer/answer/14151465?hl=en)
 
-- [x] Confirm Android-only launch scope.
-- [ ] Confirm the final application ID before changing Firebase registrations.
-- [x] Remove debug signing fallback and require ignored owner-controlled release signing configuration.
-- [ ] Supply and verify the owner's release keystore and final identity in the reviewed release environment.
-- [x] Android initializes from native Firebase configuration; omit Google sign-in UI by default. Build the current source as an ARM64 debug APK.
-- [ ] Verify signed startup, Firebase authentication, password recovery delivery, and persistence on Android. Missing-config startup recovery remains to be accepted.
-- [ ] Build release APK/AAB, verify installed behavior on target Android devices, version/build number, permissions, icons, and store metadata.
-- [x] Document Android-only launch, browser QA scope, and placeholder native platforms.
+**Exit gate:** signed artifact passes the agreed device matrix; store resources work; required closed testing and production access are complete; remaining limitations are accurately disclosed.
 
-**Gate:** a reproducible release build uses the intended Firebase app and release signing; real-device authentication and data operations pass. Application identity/signing choices require the owner's concrete values.
+## Phase 4: Run a focused mosque pilot
 
-## Phase 5 — Release acceptance and deployment (13–15 October)
+Start only after the safety/backend gates for real users pass. Proposed cohort: **one mosque, one accountable imam/manager, one backup committee contact and 20–30 Android congregants**. Pilot duration: two weeks minimum, extended for unresolved issues or applicable store-testing requirements. Recruit a varied mix of devices, ages and Urdu/English preferences; include people who need help with installations.
 
-**Status: pending.** Addresses missing end-to-end evidence.
+### Onboard the first mosque
 
-- [ ] Run the security suite and Flutter checks with final rules/indexes.
-- [ ] Use staging accounts: guest, member A, member B, verified member, imam, super-admin. Test denied operations directly as well as normal UI flows.
-- [ ] Exercise registration, verification, claims, prayers, proposals/approval, posts/comments, logout/switching, deletion/retry, offline/reconnect, and persistence after restart.
-- [ ] Run light/dark, English/Urdu RTL, small-screen keyboard, long-name/text, and empty-state checks on target devices.
-- [ ] Complete [Android prayer reminder acceptance](scripts/qa/PRAYER_REMINDERS.md): 15/20/custom lead, opt-in/denial/revocation, app closed, Friday, mosque/time changes, reboot, and signed installation.
-- [ ] Review production role migration, Firestore indexes, usage limits, support contact, privacy/deletion policy, rollback plan, and database backup/export options available to the project.
-- [ ] Record evidence and unresolved failures here. Deploy only after the reviewed rules/app migration is ready and deployment is authorized.
+1. Meet the committee and imam. Explain what the app does today; obtain consent for the listing and named manager. Verify authority independently, without collecting identity documents the current app does not need.
+2. Help the applicant register/claim through the documented pending-request flow. A trusted reviewer approves the correct request and mosque association. Never turn an ordinary signup into automatic imam access.
+3. Enter the real timetable, confirm every prayer and Friday time against the mosque's noticeboard, and compare the app on two phones. Record who maintains it and when changes are checked. Do not invent example production times.
+4. Train the imam in a short session: timetable edits, questions/answers, event approvals, deletion/moderation and escalation. Request progress is currently handled through the operator; do not promise applicant-status notifications.
+5. Put up a committee-approved QR poster linking to the appropriate test/store installation page. Give a short announcement after prayer only with approval. Demonstrate guest viewing first, then optional account/community and reminder setup. Use explicit tester opt-in.
 
-**Launch decision:** all security/data-loss blockers fixed; acceptance checks pass; remaining limitations are explicitly documented. Hold launch if any privilege escalation or unreliable deletion remains.
+Suggested pitch: “Your mosque's prayer times and announcements in one Urdu/English app. The imam controls updates; reminders are optional, and community posts are text only.” Do not advertise guaranteed alarms or features outside scope.
 
-## Implementation log
+### Measure whether people can use it comfortably
 
-### 14 October — connected Android phone
+Use a private, minimal pilot sheet and voluntary check-ins initially; no analytics SDK is assumed to exist. Record cohort counts and task outcomes, not private question text or religious activity profiles. Obtain consent for feedback and delete unnecessary contact details after the pilot.
 
-- Installed the current debug APK on the owner's Android 14 / API 34 ARM64 phone with existing app data preserved. The app restores its selected mosque, timetable and account session; English/dark prayer/settings screens and the native custom-minute keyboard layout were inspected.
-- Observed persisted custom 33 minutes, 35 weekly native alarms, Friday Jummah at the expected lead time, allowed notification/exact-alarm permission state and zero pending alarms with reminders disabled.
-- A controlled UI one-minute test saves ID 41100, then posts an actual high-importance Android notification at 17:47:58.065 PKT while the app is in the background. The one-shot leaves 35 weekly slots afterward. See [ANDROID_DEVICE_QA.md](scripts/qa/ANDROID_DEVICE_QA.md).
-- Tap navigation, audible output, reboot, deeper battery/OEM behavior, permission-denial/revocation recovery, actual daily/Friday delivery and signed-release acceptance remain unverified. No production fixture, backend deployment, privilege grant, app-data clear or device reset was performed. Production rules migration and final release identity/signing still block public launch.
+| Proposed acceptance target | How to observe it |
+| --- | --- |
+| Zero known incorrect published timetable values | Manager compares noticeboard/app whenever times change; log and resolve each discrepancy |
+| At least 8 of 10 observed newcomers select the mosque and find the next prayer without help | Observe the task once; note where help was required |
+| Manager can update times and handle a question/proposal without developer intervention | Complete each task live; confirm saved data after reopening |
+| At least half of participating testers voluntarily report using it in week two | Check-in denominator = actual participating cohort; do not label this automatic retention analytics |
+| Zero unresolved unauthorized-access, data-loss or deletion-blocking incidents | Triage log with owners and closure evidence |
+| Support effort and Firebase usage fit the owner's budget | Track time, costs, reads/writes/storage and issues daily during pilot |
 
-### 14 October — configurable prayer reminders and production audit
+These are proposed go/no-go criteria, not measured results. Any security issue or incorrect timetable pauses expansion immediately. Poor task completion triggers focused fixes and another observation, not a new feature bundle.
 
-- Added opt-in local Android reminders, default 15 minutes, presets including 20, and custom whole minutes from 1–60. Saved preferences, permission recovery, weekly exact scheduling, Friday Jummah, midnight/DST handling, native receivers, schedule replacement on mosque/timetable/locale changes, and a one-minute test are implemented. Browser platforms show the Android-only state; no paid server or Storage uploads are added.
-- Added 28 reminder calendar/provider/storage/widget tests. Final Flutter analysis is clean and all 38 Flutter tests pass. English/Urdu lead controls, 20/custom 17, invalid 61 and reload persistence were checked through Playwright; the Urdu picker was inspected at 320px. These checks cannot establish native notification delivery.
-- Hardened post metadata/ISO-date/ID validation and event metadata on create/update; blocked posts/events under missing/deleted mosques. All 35 local rules tests pass. Existing legacy schemas require migration review; ISO strings remain unchanged for feed ordering compatibility.
-- Retrieved the actual deployed Firestore rules read-only: they differ from local rules and retain email-based administration. Current comments, verification/approval and cleanup workflows are incompatible. [PRODUCTION_AUDIT.md](scripts/qa/PRODUCTION_AUDIT.md) records evidence and the required migration/deployment sequence. No production write, rule/index deployment, administrator grant or release publication occurred.
-- Android delivery/reboot/revocation acceptance remains open; follow [PRAYER_REMINDERS.md](scripts/qa/PRAYER_REMINDERS.md). Final application ID, signing and staging/production acceptance remain launch gates.
-- Native build attempts hit workstation disk exhaustion during dependency downloads/packaging. After clearing generated caches and abandoned downloads, the current reminder source builds successfully as an ARM64 debug APK (14 October, 17:22 PKT). It was not installed on Android; delivery and signed-release acceptance remain unverified.
+## Phase 5: Grow locally and test revenue
 
-### 8 October — starting Phase 1
+Only after the pilot passes, approach **two nearby mosques** through the first committee's introduction. Repeat the same authority/timetable/training checklist. Aim for 50–100 participating users across the small group as an experiment; avoid paid advertising until repeat usage and manager willingness are demonstrated.
 
-Plan created. Initial review found claim approval changed only request status, imam registration bypassed approval, the claim provider was not registered in main.dart, and the dashboard had no settings entry. These must be repaired together with the authorization rules.
+Keep the initial pilot free. Interview at least five committee decision-makers: who maintains times today, what mistakes cost them, what support they need, who approves spending, and whether they would fund continued support. Do not treat download counts or compliments as willingness to pay.
 
-### 8 October — Phases 1 and 2 implementation
+First revenue hypothesis: a mosque funds optional managed onboarding/support or a local sponsor funds an agreed free community service. Keep prayer viewing and the pilot's basic member experience free. Do not add in-app checkout, donations, ads, subscriptions or paid digital features in this release; each requires a separate product, billing-policy and implementation review. Prepare a small written offer only after learning the required support scope, and test one paid commitment before building payment machinery.
 
-- Rules reject privilege escalation and manager reassignment; managers also need a protected masjid grant. Super-admin uses `superAdmin: true` from a trusted ID token.
-- Imam registration commits a member profile and pending request together. Approval creates/links the masjid, assigns the applicant, and reviews the request atomically. The dashboard/provider/settings navigation are wired. A trusted administrator bootstrap tool defaults to a read-only preview; it was not executed against Firebase.
-- Role hydration cancels listeners and rejects stale account loads; profile edits now update Firestore as well as Auth. Management/review screens check the current session.
-- Deletion requests reauthenticate, freeze new content, remove owned data in batches, and surface failures. Completed batches remain deleted after interruption; the UI explains retries. The profile is removed after content and before Auth. If Auth deletion then fails, retry remains available; final deletion is not a cross-service transaction. Manager transfer and unidentified legacy content require reviewed admin operations.
-- Members can request verification; scoped managers approve/reject. Verified members can submit events with backend-enforced approval/full permission. Events preserve real document IDs and author metadata. Pending events are private; guests read approved events and community text.
-- Validation: `flutter analyze` clean; 6 Flutter model tests passed; 27 Firestore emulator cases passed using `demo-masjid-rules`; JavaScript syntax checks passed. These rule tests do not establish client UI behavior or production deployment.
-- No production rules/indexes/claims/data changed. Deploy the new indexes together with reviewed rules and the compatible app after migration and staging checks. Remaining work starts at Phase 3; Phase 2 client acceptance also remains open.
+Use actual economics: monthly service contribution = revenue received minus allocated hosting, moderation, support time and other direct costs. Also account for acquisition time, store/setup costs and taxes when deciding viability. A sponsor covering one expense does not establish a sustainable business. Set pricing from observed workload and committee budgets; no market-validated price exists yet.
 
+## Operating the service
 
-### 14 October — UI, reliability, and local acceptance
+| Cadence | Action |
+| --- | --- |
+| Daily during pilot | Check timetable changes, reports/support, permission failures and Firebase usage; acknowledge ordinary support within a proposed 24 hours |
+| Immediately for serious incidents | Stop promotion/new onboarding; involve the owner/trusted operator; correct timetable or access through reviewed procedures and verify recovery |
+| Weekly | Review usage, support hours, unresolved issues, manager engagement and backup contact; approve only scoped changes |
+| Before every mosque expansion | Confirm ownership/manager grant, current timetable, training, moderation capacity and directory/read growth |
+| Before every app rollout | Repeat changed-flow tests, signed smoke acceptance and compatibility review; preserve signing/migration recovery records |
 
-- Redesigned prayer times, masjid selection, public feeds, and settings around a shared emerald/cream Material theme. Dark mode uses readable theme colors; fonts and six Streamline Nova icons are bundled. English/Urdu changes update visible screens immediately, and Urdu masjid names are searchable.
-- Location is optional and requested explicitly. Timetable parsing/countdowns handle unset times, sunrise, ordering, midnight, and Friday Jummah safely. Notification scheduling and attendance remain excluded.
-- Post/event/comment reads are bounded and paginated. Removed duplicate initial reads, added refresh/error recovery, kept older pages stable, and queried manager pending events separately. Explicit post cleanup blocks new replies and removes descendants before the parent.
-- Event categories now agree between creation and filtering. Upcoming filters dates/end times; the ineffective Nearby control was removed. Event/answer dialogs preserve failed drafts, and answer cards update after saves. Password recovery and accessible password controls are available in login; signup returns to the signed-in app and passes a 320×400 browser check.
-- Privacy and README now describe public text, name hiding, optional location, real retention, retryable deletion, and release limits. QA fixtures use only hardcoded localhost demo endpoints.
-- Evidence: 31 Firestore emulator tests, 10 Flutter tests, clean analysis, an ARM64 Android debug APK, and 29 repeatable Playwright assertions against local Auth/Firestore. See [UI_QA.md](scripts/qa/UI_QA.md) for the tested flows and exact limitations. No Android device was connected; no signed release or production deployment was performed.
-- Remaining gates: final application ID, owner signing, reviewed grants/legacy migration, trusted super-admin bootstrap, production indexes/rules, staging interruption/restart failures, actual Android keyboard/offline/restart/deletion acceptance, and store metadata. Local success is not a launch certification.
+Monitor the actual Firebase console quota/usage for the current plan. Spark has finite quotas; text-only content does not make growth unlimited. Pagination reduces some reads but the directory is still unbounded and valid-request spam can consume quota. Set an owner-approved spending envelope before enabling any paid service; do not change billing automatically. Keep reminders local and avoid adding Storage uploads for this MVP.
 
+## What can proceed now
 
-### 14 October — restrained prayer-page follow-up
+Clean docs/source references, prepare the correctness/moderation changes and staging migration package, complete local tests, draft store copy/resources and recruit potential committee partners/testers manually. Final ID, trusted UID identities, signing custody and deployment/publication authorization remain owner-controlled decisions, not assumed answers.
 
-The owner requested a small undo of the prayer redesign. Restored individual timetable cards, separated name/time columns, and familiar Material time-of-day icons; reduced next-prayer typography and omitted the zero-hour countdown segment. Verified clean analysis, 10 Flutter tests, and Playwright screenshots at 390×844 English/light and 320×640 Urdu/dark. The scheduling and Firestore behavior remain intact. Device and release gates remain pending.
+The immediate business goal is **one mosque maintaining accurate times and real congregants returning comfortably**. Move to more mosques and paid commitments only when the pilot provides evidence.
