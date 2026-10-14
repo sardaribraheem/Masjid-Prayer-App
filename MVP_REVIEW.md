@@ -2,7 +2,7 @@
 
 **Live work tracker:** [launchplan.md](launchplan.md). The findings below describe the initial baseline; implementation status is recorded there.
 
-**Current verdict — 14 October: hold public launch.** A read-only audit now confirms production still uses the older email-based authorization rules, last updated 16 September. It lacks current comment, approval, guest-read, and cleanup permissions. See [production audit](scripts/qa/PRODUCTION_AUDIT.md) for confirmed findings and the reviewed deployment sequence. Final Android identity/signing and device acceptance remain open. Optional configurable prayer reminders are now implemented and locally tested, with actual Android delivery still pending.
+**Current verdict — 14 October: hold public launch.** A read-only audit now confirms production still uses the older email-based authorization rules, last updated 16 September. It lacks current comment, approval, guest-read, and cleanup permissions. See [production audit](scripts/qa/PRODUCTION_AUDIT.md) for confirmed findings and the reviewed deployment sequence. Final Android identity/signing and broader device acceptance remain open. Optional configurable prayer reminders are implemented, locally tested, and pass one controlled Android 14 background-delivery test; see [device evidence](scripts/qa/ANDROID_DEVICE_QA.md). Reboot and signed-release acceptance remain pending.
 
 Initial source review, not a complete security audit or production verification. Existing uncommitted changes were preserved. Target launch: 15 October 2026 if “in a week” remains the plan.
 

@@ -4,11 +4,11 @@ Flutter Android MVP for masjid communities, using Firebase Authentication, Fires
 
 ## Launch status
 
-The current implementation has local Flutter, security-emulator, and browser QA evidence. This is not production or Android device acceptance. [launchplan.md](launchplan.md) records phase progress, and [MVP_REVIEW.md](MVP_REVIEW.md) retains the initial findings. See [UI QA](scripts/qa/UI_QA.md) for the latest checks and limits.
+The current implementation has local Flutter, security-emulator, browser QA, and limited [Android device evidence](scripts/qa/ANDROID_DEVICE_QA.md). Broader device/signed-release acceptance and production migration remain pending. [launchplan.md](launchplan.md) records phase progress, and [MVP_REVIEW.md](MVP_REVIEW.md) retains the initial findings. See [UI QA](scripts/qa/UI_QA.md) for the latest checks and limits.
 
 Android is the only launch target. The final application ID remains pending; the existing registration is `com.example.masjid_app`. Release signing, reviewed production role migration, rules/index deployment, and real-device acceptance remain release gates. See [Android release instructions](scripts/qa/ANDROID_RELEASE.md).
 
-Optional local Android prayer reminders are implemented: default 15 minutes, presets including 20 minutes, or a custom 1–60 minute lead for the selected masjid. Friday uses Jummah instead of Dhuhr when set. Reminders are off until the user enables them and grants notification/alarm permissions. They use the phone timezone and last saved timetable; reopen the app to refresh changes. Actual delivery/reboot acceptance is still pending; see [reminder QA](scripts/qa/PRAYER_REMINDERS.md). No Storage uploads or paid server scheduler are added.
+Optional local Android prayer reminders are implemented: default 15 minutes, presets including 20 minutes, or a custom 1–60 minute lead for the selected masjid. Friday uses Jummah instead of Dhuhr when set. Reminders are off until the user enables them and grants notification/alarm permissions. They use the phone timezone and last saved timetable; reopen the app to refresh changes. One Android 14 background test delivers on time; reboot, broader delivery and signed-release acceptance remain pending. See [reminder QA](scripts/qa/PRAYER_REMINDERS.md). No Storage uploads or paid server scheduler are added.
 
 Attendance registration remains deferred. Google sign-in UI is disabled unless `ENABLE_GOOGLE_SIGN_IN=true`; enable it only after OAuth configuration and device verification. Community attachments and uploads are excluded. Anonymous posting hides the display name; stored author UIDs remain readable.
 

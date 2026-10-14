@@ -99,6 +99,13 @@ Status: **in progress** = work underway; **local verified** = code and local che
 
 ## Implementation log
 
+### 14 October — connected Android phone
+
+- Installed the current debug APK on the owner's Android 14 / API 34 ARM64 phone with existing app data preserved. The app restores its selected mosque, timetable and account session; English/dark prayer/settings screens and the native custom-minute keyboard layout were inspected.
+- Observed persisted custom 33 minutes, 35 weekly native alarms, Friday Jummah at the expected lead time, allowed notification/exact-alarm permission state and zero pending alarms with reminders disabled.
+- A controlled UI one-minute test saves ID 41100, then posts an actual high-importance Android notification at 17:47:58.065 PKT while the app is in the background. The one-shot leaves 35 weekly slots afterward. See [ANDROID_DEVICE_QA.md](scripts/qa/ANDROID_DEVICE_QA.md).
+- Tap navigation, audible output, reboot, deeper battery/OEM behavior, permission-denial/revocation recovery, actual daily/Friday delivery and signed-release acceptance remain unverified. No production fixture, backend deployment, privilege grant, app-data clear or device reset was performed. Production rules migration and final release identity/signing still block public launch.
+
 ### 14 October — configurable prayer reminders and production audit
 
 - Added opt-in local Android reminders, default 15 minutes, presets including 20, and custom whole minutes from 1–60. Saved preferences, permission recovery, weekly exact scheduling, Friday Jummah, midnight/DST handling, native receivers, schedule replacement on mosque/timetable/locale changes, and a one-minute test are implemented. Browser platforms show the Android-only state; no paid server or Storage uploads are added.

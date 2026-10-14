@@ -6,6 +6,8 @@ This pass uses Streamline MCP for the bundled Nova icons and Playwright MCP agai
 
 The new reminder Android build initially failed because this workstation ran out of disk space. After clearing generated project caches, abandoned Gradle downloads and the obsolete downloaded Gradle 8.12 distribution, `flutter build apk --debug --target-platform android-arm64` passed. The refreshed APK is `build/app/outputs/flutter-apk/app-debug.apk` (90,840,181 bytes; built 14 October at 17:22 PKT). This verifies compilation/packaging, not installation, native delivery or release signing.
 
+**Connected-device follow-up:** the same APK was subsequently installed successfully on the owner's Android 14 phone without clearing app data. Startup, native English/dark prayer/settings screens, saved custom 33-minute lead, 35 weekly alarms, Friday Jummah metadata and disabled-state cancellation were observed. A controlled one-minute test posted a real Android notification at 17:47:58.065 PKT while the app was in the background. See [ANDROID_DEVICE_QA.md](ANDROID_DEVICE_QA.md) for exact evidence and remaining limits. This supersedes the earlier lack of device evidence for these specific checks only.
+
 ## Verified locally
 
 | Check | Evidence |

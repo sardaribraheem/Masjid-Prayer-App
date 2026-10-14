@@ -149,6 +149,10 @@ The current reminder source builds as an ARM64 debug APK after clearing generate
 
 The read-only production audit confirmed the old deployed email-based rules from 16 September, missing current comment/approval/cleanup permissions. Public launch remains blocked until the reviewed migration, trusted grants, coordinated rules/index deployment and staging/device acceptance pass. See scripts/qa/PRODUCTION_AUDIT.md; no production changes were made.
 
+## 2026-10-14 connected Android phone
+
+The current APK installs on the owner's Android 14 device with existing data preserved. Native startup, English/dark prayer/settings UI, saved custom 33 minutes, 35 weekly alarms, Friday Jummah metadata and off-state cancellation were observed. The real one-minute test notification posted at 17:47:58.065 PKT with the app in the background; see scripts/qa/ANDROID_DEVICE_QA.md. This verifies one device/debug delivery scenario, not reboot, all permission/revocation cases, daily/Friday delivery, tap navigation, signed-release behavior or the deployed backend. Item 12 remains in progress.
+
 
 ## 2026-10-14 UI and launch-readiness pass
 

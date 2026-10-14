@@ -1,6 +1,6 @@
 # Android prayer reminder acceptance
 
-Implemented at the owner's request on 14 October 2026. **Local logic and UI checks pass; actual Android delivery is not verified.** No Android device or configured AVD was available during this pass. Do not mark this feature release verified based on browser tests or an APK build.
+Implemented at the owner's request on 14 October 2026. **Local logic/UI checks and one controlled Android background-delivery test pass.** The owner subsequently connected an Android 14 phone: the actual one-minute notification arrived at its scheduled time. See [device evidence](ANDROID_DEVICE_QA.md). This is a debug build on one device; broader delivery, reboot, permission-revocation and signed-release acceptance remain pending.
 
 In Settings → Prayer reminders, enable alerts explicitly. The default lead is 15 minutes; presets are 5, 10, 15, 20, 30, and 60, with custom whole minutes from 1 through 60. The old saved-only notification preference does not opt users into the new scheduler. Permissions are requested only when enabling/retrying, not during startup or ordinary navigation.
 
