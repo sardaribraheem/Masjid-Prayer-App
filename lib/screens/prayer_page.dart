@@ -8,7 +8,6 @@ import '../services/firebase_service.dart';
 import '../l10n/app_localization.dart';
 import '../l10n/app_strings.dart';
 import '../utils/prayer_schedule.dart';
-import '../widgets/app_icon.dart';
 import '../widgets/shared/empty_state.dart';
 import 'admin_panel_screen.dart';
 
@@ -50,6 +49,71 @@ class _PrayerPageState extends State<PrayerPage> {
   }
 
   String name(String value) => appLocalization.t(value.toLowerCase());
+
+  String _remainingText(Duration remaining) {
+    final minutes = remaining.inMinutes % 60;
+    final minuteLabel = appLocalization.t(
+      minutes == 1 ? AppStrings.minuteRemaining : AppStrings.minutesRemaining,
+    );
+    if (remaining.inHours == 0) return '$minutes $minuteLabel';
+    final hours = remaining.inHours;
+    final hourLabel = appLocalization.t(
+      hours == 1 ? AppStrings.hourRemaining : AppStrings.hoursRemaining,
+    );
+    return '$hours $hourLabel · $minutes $minuteLabel';
+  }
+
+  Widget _prayerIcon(String prayerName, {double size = 24, Color? color}) {
+    final (icon, lightColor, darkColor) = switch (prayerName.toLowerCase()) {
+      'fajr' || 'sunrise' => (
+        Icons.wb_twilight_rounded,
+        const Color(0xFFA56918),
+        const Color(0xFFEBC582),
+      ),
+      'dhuhr' => (
+        Icons.wb_sunny_outlined,
+        const Color(0xFF926514),
+        const Color(0xFFF1D37B),
+      ),
+      'asr' => (
+        Icons.brightness_6_outlined,
+        const Color(0xFFA46424),
+        const Color(0xFFE7B578),
+      ),
+      'maghrib' || 'sunset' => (
+        Icons.wb_twilight_rounded,
+        const Color(0xFFB45D3B),
+        const Color(0xFFEEAA8A),
+      ),
+      'isha' => (
+        Icons.dark_mode_outlined,
+        const Color(0xFF526B9B),
+        const Color(0xFFAABFE6),
+      ),
+      'jummah' => (
+        Icons.mosque_outlined,
+        const Color(0xFF1B5E47),
+        const Color(0xFFA2D9BA),
+      ),
+      _ => (
+        Icons.schedule_outlined,
+        const Color(0xFF1B5E47),
+        const Color(0xFFA2D9BA),
+      ),
+    };
+    return ExcludeSemantics(
+      child: Icon(
+        icon,
+        size: size,
+        color:
+            color ??
+            (Theme.of(context).brightness == Brightness.dark
+                ? darkColor
+                : lightColor),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: appLocalization,
@@ -136,7 +200,7 @@ class _PrayerPageState extends State<PrayerPage> {
                 )
               else
                 Container(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1B5E47),
                     borderRadius: BorderRadius.circular(20),
@@ -146,7 +210,7 @@ class _PrayerPageState extends State<PrayerPage> {
                     children: [
                       Row(
                         children: [
-                          const AppIcon('prayer', color: Colors.white),
+                          _prayerIcon(next.prayer.name, color: Colors.white),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
@@ -156,12 +220,12 @@ class _PrayerPageState extends State<PrayerPage> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 12),
                       Text(
                         name(next.prayer.name),
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 32,
+                          fontSize: 28,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -171,13 +235,13 @@ class _PrayerPageState extends State<PrayerPage> {
                         textDirection: TextDirection.ltr,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 36,
+                          fontSize: 28,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        '${next.at.difference(now).inHours} ${appLocalization.t(AppStrings.hoursRemaining)} · ${next.at.difference(now).inMinutes % 60} ${appLocalization.t(AppStrings.minutesRemaining)}',
+                        _remainingText(next.at.difference(now)),
                         style: const TextStyle(color: Colors.white),
                       ),
                     ],
@@ -189,31 +253,48 @@ class _PrayerPageState extends State<PrayerPage> {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 12),
-              Card(
-                child: Column(
-                  children: prayers
-                      .map(
-                        (prayer) => ListTile(
-                          leading: AppIcon(
-                            [
-                                  'sunrise',
-                                  'sunset',
-                                ].contains(prayer.name.toLowerCase())
-                                ? 'sun'
-                                : 'prayer',
-                            color: scheme.primary,
+              ...prayers.map(
+                (prayer) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 16,
+                      ),
+                      child: Row(
+                        children: [
+                          _prayerIcon(prayer.name),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              name(prayer.name),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           ),
-                          title: Text(name(prayer.name)),
-                          trailing: Text(
-                            parsePrayerMinutes(prayer.time) == null
-                                ? appLocalization.t(AppStrings.notSet)
-                                : prayer.time,
-                            textDirection: TextDirection.ltr,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Text(
+                              parsePrayerMinutes(prayer.time) == null
+                                  ? appLocalization.t(AppStrings.notSet)
+                                  : prayer.time,
+                              textDirection: TextDirection.ltr,
+                              textAlign: appLocalization.isRTL
+                                  ? TextAlign.start
+                                  : TextAlign.end,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
-                        ),
-                      )
-                      .toList(),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],

@@ -120,3 +120,8 @@ Plan created. Initial review found claim approval changed only request status, i
 - Privacy and README now describe public text, name hiding, optional location, real retention, retryable deletion, and release limits. QA fixtures use only hardcoded localhost demo endpoints.
 - Evidence: 31 Firestore emulator tests, 10 Flutter tests, clean analysis, an ARM64 Android debug APK, and 29 repeatable Playwright assertions against local Auth/Firestore. See [UI_QA.md](scripts/qa/UI_QA.md) for the tested flows and exact limitations. No Android device was connected; no signed release or production deployment was performed.
 - Remaining gates: final application ID, owner signing, reviewed grants/legacy migration, trusted super-admin bootstrap, production indexes/rules, staging interruption/restart failures, actual Android keyboard/offline/restart/deletion acceptance, and store metadata. Local success is not a launch certification.
+
+
+### 14 October — restrained prayer-page follow-up
+
+The owner requested a small undo of the prayer redesign. Restored individual timetable cards, separated name/time columns, and familiar Material time-of-day icons; reduced next-prayer typography and omitted the zero-hour countdown segment. Verified clean analysis, 10 Flutter tests, and Playwright screenshots at 390×844 English/light and 320×640 Urdu/dark. The scheduling and Firestore behavior remain intact. Device and release gates remain pending.

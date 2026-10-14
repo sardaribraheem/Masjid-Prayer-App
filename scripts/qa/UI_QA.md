@@ -49,3 +49,8 @@ Flutter's editable semantics names change when fields gain focus. The scripts us
 No production Firebase rules, indexes, claims, data, or store releases were deployed in this pass.
 
 Password recovery uses the documented [Firebase Flutter API](https://firebase.google.com/docs/auth/flutter/manage-users#send_a_password_reset_email). See [asset licensing](../../assets/README.md) and [Android release gate](ANDROID_RELEASE.md).
+
+
+## Prayer-page follow-up
+
+A small owner-requested visual adjustment restores individual prayer cards, name/time alignment at opposite edges (mirrored in Urdu), and Material dawn/sun/afternoon/moon icons. The next-prayer card is slightly smaller and omits a zero-hour countdown segment. Clean analysis and all 10 Flutter tests pass. Playwright screenshots were inspected at 390×844 English/light and 320×640 Urdu/dark with no Flutter console errors. This follow-up does not change Firestore rules or establish Android device acceptance.

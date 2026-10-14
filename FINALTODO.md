@@ -121,7 +121,7 @@
 - [~] Prevent keyboard from corrupting layouts, covering fields, or pushing buttons off-screen across all key forms
 
 ### 32. Streamline Icons
-- [~] Six bundled Streamline Nova icons cover navigation, community header, and prayer/sun rows. Material icons remain for categories and management; do not claim every control uses Streamline.
+- [~] Streamline Nova icons cover navigation and the community header. Prayer rows now use familiar Material time-of-day icons; categories and management also use Material. Do not claim every control uses Streamline.
 
 ### 33. Fake / Sample Data
 - [x] Remove production reliance on `FirebaseService.initializeSampleData()`
@@ -147,3 +147,8 @@ Prior completion claims are not release evidence. See MVP_REVIEW.md for source-c
 Shared Material theme, bundled Poppins/Streamline assets, optional location, prayer countdown edge cases, bounded feeds/comments, post cleanup, canonical event categories, real Upcoming/All filtering, refreshed settings/privacy, and login password recovery are implemented. See [UI_QA.md](scripts/qa/UI_QA.md) for browser and emulator evidence.
 
 Analysis, 10 Flutter tests, and 31 rule tests pass; an ARM64 debug APK builds. 29 repeatable Playwright assertions verify local demo flows, including denied-save recovery and full account cleanup, not production. No Android device was available; actual keyboard behavior, signed release configuration, staging/production migration, deployed indexes/rules, and failure/restart acceptance remain open. Broad checklist items remain in progress until that evidence exists.
+
+
+## 2026-10-14 prayer-page adjustment
+
+At the owner's request, restored individual prayer cards with names and times aligned at opposite edges, distinct dawn/day/afternoon/night icons, and a slightly smaller next-prayer card. English/Urdu RTL and light/dark browser previews pass; analysis is clean and all 10 Flutter tests pass. No other screen behavior, authorization rules, or release gates changed.
