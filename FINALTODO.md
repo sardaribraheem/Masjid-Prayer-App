@@ -145,6 +145,8 @@ Prior completion claims are not release evidence. See MVP_REVIEW.md for source-c
 
 Optional configurable Android reminders are implemented and pass 28 new local logic/UI tests (38 Flutter tests total), with clean analysis. Playwright checked lead selection, custom validation, persistence and Urdu layout. Native delivery/reboot and signed device acceptance remain pending. Post/event metadata rules and orphan-parent checks pass 35 local rule tests.
 
+The current reminder source builds as an ARM64 debug APK after clearing generated caches to resolve workstation disk exhaustion. This establishes compilation, not actual notification delivery or release readiness.
+
 The read-only production audit confirmed the old deployed email-based rules from 16 September, missing current comment/approval/cleanup permissions. Public launch remains blocked until the reviewed migration, trusted grants, coordinated rules/index deployment and staging/device acceptance pass. See scripts/qa/PRODUCTION_AUDIT.md; no production changes were made.
 
 

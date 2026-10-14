@@ -106,7 +106,7 @@ Status: **in progress** = work underway; **local verified** = code and local che
 - Hardened post metadata/ISO-date/ID validation and event metadata on create/update; blocked posts/events under missing/deleted mosques. All 35 local rules tests pass. Existing legacy schemas require migration review; ISO strings remain unchanged for feed ordering compatibility.
 - Retrieved the actual deployed Firestore rules read-only: they differ from local rules and retain email-based administration. Current comments, verification/approval and cleanup workflows are incompatible. [PRODUCTION_AUDIT.md](scripts/qa/PRODUCTION_AUDIT.md) records evidence and the required migration/deployment sequence. No production write, rule/index deployment, administrator grant or release publication occurred.
 - Android delivery/reboot/revocation acceptance remains open; follow [PRAYER_REMINDERS.md](scripts/qa/PRAYER_REMINDERS.md). Final application ID, signing and staging/production acceptance remain launch gates.
-- Native build attempts hit workstation disk exhaustion during dependency downloads. The final attempt after clearing generated caches is pending; the earlier debug APK predates reminders. Do not confuse the earlier APK evidence with a successful build of this feature.
+- Native build attempts hit workstation disk exhaustion during dependency downloads/packaging. After clearing generated caches and abandoned downloads, the current reminder source builds successfully as an ARM64 debug APK (14 October, 17:22 PKT). It was not installed on Android; delivery and signed-release acceptance remain unverified.
 
 ### 8 October — starting Phase 1
 

@@ -4,7 +4,7 @@ This pass uses Streamline MCP for the bundled Nova icons and Playwright MCP agai
 
 **Later 14 October reminder pass:** clean analysis, 38 Flutter tests and 35 rules cases now pass. `playwright-reminder-qa.js` passes 6 assertions for the 20-minute preset, rejection of custom 61, custom 17 and its persistence after reload, Android-only browser status, and Urdu controls; the Urdu picker was visually inspected at 320×740 after reload. A provider subscription placement issue caught during this pass was corrected. Actual Android reminder delivery remains pending. [Production audit](PRODUCTION_AUDIT.md) confirms deployed rules still differ from the tested local rules and block public launch. The table below records the earlier UI pass, not native acceptance of the new reminders.
 
-The new reminder Android build initially failed downloading dependencies because this workstation ran out of disk space. Generated project caches and the obsolete downloaded Gradle 8.12 distribution were cleared; a final build attempt is pending. The earlier APK predates these reminders and must not be treated as notification verification.
+The new reminder Android build initially failed because this workstation ran out of disk space. After clearing generated project caches, abandoned Gradle downloads and the obsolete downloaded Gradle 8.12 distribution, `flutter build apk --debug --target-platform android-arm64` passed. The refreshed APK is `build/app/outputs/flutter-apk/app-debug.apk` (90,840,181 bytes; built 14 October at 17:22 PKT). This verifies compilation/packaging, not installation, native delivery or release signing.
 
 ## Verified locally
 
