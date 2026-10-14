@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Clock Circle 1, Streamline Nova Free, CC BY 4.0. See assets/README.md. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <group android:translateX="0.75" android:translateY="0.75">
+        <path android:fillColor="#FFFFFFFF" android:pathData="M11.25 0c6.2131875 0 11.25 5.03679375 11.25 11.25 0 6.2131875 -5.0368125 11.25 -11.25 11.25 -6.21320625 0 -11.25 -5.0368125 -11.25 -11.25C0 5.03679375 5.03679375 0 11.25 0m0 1.875C6.072328125 1.875 1.875 6.072328125 1.875 11.25c0 5.177625 4.197328125 9.375 9.375 9.375 5.177625 0 9.375 -4.197375 9.375 -9.375 0 -5.177671875 -4.197375 -9.375 -9.375 -9.375m0.9375 9.045375 3.544875 4.4311875 -1.46475 1.171875 -3.75 -4.6875C10.38459375 11.66971875 10.3125 11.46290625 10.3125 11.25V4.6875h1.875z" />
+    </group>
+</vector>

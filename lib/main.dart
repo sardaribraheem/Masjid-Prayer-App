@@ -16,6 +16,9 @@ import 'providers/masjid_provider.dart';
 import 'providers/location_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/masjid_claim_provider.dart';
+import 'providers/prayer_reminder_provider.dart';
+import 'services/prayer_notification_service.dart';
+import 'widgets/prayer_reminder_binding.dart';
 
 void main() async {
   // Ensure Flutter bindings are initialized
@@ -85,6 +88,14 @@ class MyApp extends StatelessWidget {
                 ChangeNotifierProvider(create: (_) => MasjidProvider()),
                 ChangeNotifierProvider(create: (_) => LocationProvider()),
                 ChangeNotifierProvider(create: (_) => SettingsProvider()),
+                ChangeNotifierProvider(
+                  create: (_) => PrayerReminderProvider(
+                    store: StorageService(),
+                    gateway: AndroidPrayerNotificationService(),
+                    masjidStream: FirebaseService().getMasjidStream,
+                    locale: appLocalization.locale,
+                  ),
+                ),
                 ChangeNotifierProvider(create: (_) => MasjidClaimProvider()),
               ],
               child: MaterialApp(
@@ -101,7 +112,10 @@ class MyApp extends StatelessWidget {
                     textDirection: appLocalization.isRTL
                         ? TextDirection.rtl
                         : TextDirection.ltr,
-                    child: child!,
+                    child: PrayerReminderBinding(
+                      locale: appLocalization.locale,
+                      child: child!,
+                    ),
                   );
                 },
                 home: startWithHome

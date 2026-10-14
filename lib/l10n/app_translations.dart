@@ -7,6 +7,36 @@ class AppTranslations {
 
   static const Map<String, Map<String, String>> _translations = {
     'en': {
+      "prayer_reminders": "Prayer reminders",
+      "reminder_lead_title": "Remind me before prayer",
+      "reminder_lead_value": "{minutes} minutes before each prayer",
+      "reminder_minutes": "{minutes} min",
+      "reminder_custom": "Custom minutes (1–60)",
+      "reminder_range": "Enter a whole number from 1 to 60.",
+      "reminder_off": "Optional alerts for your selected masjid.",
+      "reminder_on": "Reminders are scheduled.",
+      "reminder_permissions":
+          "Allow notifications and Alarms & reminders in Android settings, then return here.",
+      "reminder_no_masjid": "Choose a masjid to schedule reminders.",
+      "reminder_no_times": "Waiting for the imam to set prayer times.",
+      "reminder_android_only":
+          "Prayer reminders are available in the Android app.",
+      "reminder_failed": "Could not update reminders. Please retry.",
+      "reminder_sync_failed": "Could not refresh prayer times. Please retry.",
+      "reminder_updating": "Updating reminders…",
+      "reminder_timetable_note":
+          "Uses your phone’s timezone and the selected masjid’s saved timetable. Open the app to refresh times. Your phone’s battery settings may affect delivery.",
+      "reminder_allow": "Allow reminders",
+      "reminder_open_settings": "Notification settings",
+      "reminder_test": "Test reminder in 1 minute",
+      "reminder_test_sent":
+          "A test reminder is scheduled for one minute from now. You can close the app to check it.",
+      "reminder_test_title": "Prayer reminder test",
+      "reminder_test_body": "Your prayer reminders can appear here.",
+      "reminder_title": "{prayer} in {minutes} minutes",
+      "privacy_reminders_title": "Optional prayer reminders",
+      "privacy_reminders_body":
+          "If you enable reminders, the lead time and enabled preference are saved on this device. Android schedules alerts from your selected masjid’s last saved timetable in your phone’s timezone. Open the app to refresh changed times. Notification and alarm permissions are optional; device battery settings may affect delivery. No media upload or paid server scheduler is used.",
       'email_label': 'Email',
       'show_password': 'Show password',
       'hide_password': 'Hide password',
@@ -362,6 +392,38 @@ class AppTranslations {
       'december': 'December',
     },
     'ur': {
+      "prayer_reminders": "نماز کی یاد دہانیاں",
+      "reminder_lead_title": "نماز سے پہلے یاد دلائیں",
+      "reminder_lead_value": "ہر نماز سے {minutes} منٹ پہلے",
+      "reminder_minutes": "{minutes} منٹ",
+      "reminder_custom": "اپنے منٹ منتخب کریں (۱–۶۰)",
+      "reminder_range": "۱ سے ۶۰ تک مکمل عدد درج کریں۔",
+      "reminder_off": "منتخب مسجد کے لیے اختیاری یاد دہانیاں۔",
+      "reminder_on": "یاد دہانیاں مقرر ہیں۔",
+      "reminder_permissions":
+          "اینڈرائیڈ کی ترتیبات میں نوٹیفکیشن اور الارم و یاد دہانیوں کی اجازت دیں، پھر یہاں واپس آئیں۔",
+      "reminder_no_masjid": "یاد دہانیوں کے لیے مسجد منتخب کریں۔",
+      "reminder_no_times":
+          "امام کی جانب سے نماز کے اوقات مقرر ہونے کا انتظار ہے۔",
+      "reminder_android_only":
+          "نماز کی یاد دہانیاں اینڈرائیڈ ایپ میں دستیاب ہیں۔",
+      "reminder_failed": "یاد دہانیاں تازہ نہیں ہو سکیں۔ دوبارہ کوشش کریں۔",
+      "reminder_sync_failed":
+          "نماز کے اوقات تازہ نہیں ہو سکے۔ دوبارہ کوشش کریں۔",
+      "reminder_updating": "یاد دہانیاں تازہ ہو رہی ہیں…",
+      "reminder_timetable_note":
+          "آپ کے فون کا ٹائم زون اور منتخب مسجد کے محفوظ اوقات استعمال ہوتے ہیں۔ نئے اوقات کے لیے ایپ کھولیں۔ فون کی بیٹری کی ترتیبات ترسیل پر اثر ڈال سکتی ہیں۔",
+      "reminder_allow": "یاد دہانیوں کی اجازت دیں",
+      "reminder_open_settings": "نوٹیفکیشن کی ترتیبات",
+      "reminder_test": "ایک منٹ میں آزمائشی یاد دہانی",
+      "reminder_test_sent":
+          "ایک منٹ بعد آزمائشی یاد دہانی مقرر ہے۔ اسے جانچنے کے لیے ایپ بند کر سکتے ہیں۔",
+      "reminder_test_title": "نماز کی یاد دہانی کی آزمائش",
+      "reminder_test_body": "نماز کی یاد دہانیاں یہاں ظاہر ہو سکتی ہیں۔",
+      "reminder_title": "{prayer} میں {minutes} منٹ باقی",
+      "privacy_reminders_title": "نماز کی اختیاری یاد دہانیاں",
+      "privacy_reminders_body":
+          "یاد دہانیاں فعال کرنے پر ان کی ترجیح اور منٹ اس فون پر محفوظ ہوتے ہیں۔ اینڈرائیڈ منتخب مسجد کے آخری محفوظ اوقات اور فون کے ٹائم زون سے اطلاع مقرر کرتا ہے۔ اوقات کی تبدیلی کے لیے ایپ کھولیں۔ نوٹیفکیشن اور الارم کی اجازت اختیاری ہے؛ بیٹری کی ترتیبات ترسیل پر اثر ڈال سکتی ہیں۔ کوئی میڈیا اپ لوڈ یا ادا شدہ سرور شیڈولر استعمال نہیں ہوتا۔",
       'email_label': 'ای میل',
       'show_password': 'پاس ورڈ دکھائیں',
       'hide_password': 'پاس ورڈ چھپائیں',

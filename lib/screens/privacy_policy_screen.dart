@@ -19,6 +19,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
           'account',
           'community',
           'location',
+          'reminders',
           'retention',
           'deletion',
           'contact',

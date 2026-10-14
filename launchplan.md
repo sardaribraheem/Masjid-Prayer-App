@@ -4,6 +4,8 @@ Target: 15 October 2026 (Asia/Karachi). Launch platform: **Android only**, confi
 
 Status: **in progress** = work underway; **local verified** = code and local checks pass; **release verified** = staging/device checks also pass. No phase is release verified yet.
 
+**Current decision: hold public launch.** A read-only production audit on 14 October confirms Firestore still serves the old email-based rules (release updated 16 September), incompatible with current comments, approval, and cleanup workflows. Final Android identity/signing and device acceptance also remain pending. See [production audit](scripts/qa/PRODUCTION_AUDIT.md). Local source improvements do not repair production until the reviewed migration/deployment is completed.
+
 ## Scope decisions
 
 - Community posts/comments are text-only. Use existing Firebase Auth + Firestore; do not introduce Storage or a paid backend for the MVP.
@@ -12,7 +14,7 @@ Status: **in progress** = work underway; **local verified** = code and local che
 - A manager must have an imam/admin user role, a matching masjid association, and membership in that masjid's protected `authorizedImamUids` list.
 - Existing anonymous posting hides the display name only; do not promise that other readers cannot discover the author UID.
 - Defer attendance registration for this MVP; source inspection found no persistence or registration UI despite checklist claims. Revisit it after the launch-critical flows work.
-- Omit prayer notifications from this MVP until a real scheduler is implemented and device-tested. Remove the active toggle and inaccurate completion claims.
+- The owner requested optional prayer reminders on 14 October. Implement the local Android scheduler and user-selected lead time; include it in release only after device delivery/permissions/reboot acceptance. Attendance remains deferred.
 - Do not promise automated archival. Define actual deletion/retention behavior and update privacy text.
 
 ## Phase 1 — Authorization and imam onboarding (8–9 October)
@@ -89,12 +91,22 @@ Status: **in progress** = work underway; **local verified** = code and local che
 - [ ] Use staging accounts: guest, member A, member B, verified member, imam, super-admin. Test denied operations directly as well as normal UI flows.
 - [ ] Exercise registration, verification, claims, prayers, proposals/approval, posts/comments, logout/switching, deletion/retry, offline/reconnect, and persistence after restart.
 - [ ] Run light/dark, English/Urdu RTL, small-screen keyboard, long-name/text, and empty-state checks on target devices.
+- [ ] Complete [Android prayer reminder acceptance](scripts/qa/PRAYER_REMINDERS.md): 15/20/custom lead, opt-in/denial/revocation, app closed, Friday, mosque/time changes, reboot, and signed installation.
 - [ ] Review production role migration, Firestore indexes, usage limits, support contact, privacy/deletion policy, rollback plan, and database backup/export options available to the project.
 - [ ] Record evidence and unresolved failures here. Deploy only after the reviewed rules/app migration is ready and deployment is authorized.
 
 **Launch decision:** all security/data-loss blockers fixed; acceptance checks pass; remaining limitations are explicitly documented. Hold launch if any privilege escalation or unreliable deletion remains.
 
 ## Implementation log
+
+### 14 October — configurable prayer reminders and production audit
+
+- Added opt-in local Android reminders, default 15 minutes, presets including 20, and custom whole minutes from 1–60. Saved preferences, permission recovery, weekly exact scheduling, Friday Jummah, midnight/DST handling, native receivers, schedule replacement on mosque/timetable/locale changes, and a one-minute test are implemented. Browser platforms show the Android-only state; no paid server or Storage uploads are added.
+- Added 28 reminder calendar/provider/storage/widget tests. Final Flutter analysis is clean and all 38 Flutter tests pass. English/Urdu lead controls, 20/custom 17, invalid 61 and reload persistence were checked through Playwright; the Urdu picker was inspected at 320px. These checks cannot establish native notification delivery.
+- Hardened post metadata/ISO-date/ID validation and event metadata on create/update; blocked posts/events under missing/deleted mosques. All 35 local rules tests pass. Existing legacy schemas require migration review; ISO strings remain unchanged for feed ordering compatibility.
+- Retrieved the actual deployed Firestore rules read-only: they differ from local rules and retain email-based administration. Current comments, verification/approval and cleanup workflows are incompatible. [PRODUCTION_AUDIT.md](scripts/qa/PRODUCTION_AUDIT.md) records evidence and the required migration/deployment sequence. No production write, rule/index deployment, administrator grant or release publication occurred.
+- Android delivery/reboot/revocation acceptance remains open; follow [PRAYER_REMINDERS.md](scripts/qa/PRAYER_REMINDERS.md). Final application ID, signing and staging/production acceptance remain launch gates.
+- Native build attempts hit workstation disk exhaustion during dependency downloads. The final attempt after clearing generated caches is pending; the earlier debug APK predates reminders. Do not confuse the earlier APK evidence with a successful build of this feature.
 
 ### 8 October — starting Phase 1
 

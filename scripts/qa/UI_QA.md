@@ -2,6 +2,10 @@
 
 This pass uses Streamline MCP for the bundled Nova icons and Playwright MCP against a Flutter web preview connected to local Firebase Auth/Firestore emulators. The launch target remains Android. Browser QA and a debug APK do not establish signed Android behavior or deployed Firebase rules.
 
+**Later 14 October reminder pass:** clean analysis, 38 Flutter tests and 35 rules cases now pass. `playwright-reminder-qa.js` passes 6 assertions for the 20-minute preset, rejection of custom 61, custom 17 and its persistence after reload, Android-only browser status, and Urdu controls; the Urdu picker was visually inspected at 320×740 after reload. A provider subscription placement issue caught during this pass was corrected. Actual Android reminder delivery remains pending. [Production audit](PRODUCTION_AUDIT.md) confirms deployed rules still differ from the tested local rules and block public launch. The table below records the earlier UI pass, not native acceptance of the new reminders.
+
+The new reminder Android build initially failed downloading dependencies because this workstation ran out of disk space. Generated project caches and the obsolete downloaded Gradle 8.12 distribution were cleared; a final build attempt is pending. The earlier APK predates these reminders and must not be treated as notification verification.
+
 ## Verified locally
 
 | Check | Evidence |

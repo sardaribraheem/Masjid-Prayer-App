@@ -56,7 +56,7 @@
 ## SESSION 2 — PRAYER, EVENTS, COMMUNITY, QUESTIONS
 
 ### 12. Namaz Notifications
-- [ ] Scheduler is absent. Notifications are deferred from this MVP; the saved-only toggle and scheduling promises were removed.
+- [~] Optional local Android reminders implemented: default 15 minutes, presets including 20, custom 1–60 minutes, persisted opt-in, permission handling, Friday Jummah, timetable/masjid refresh, cancellation, and a one-minute test. Calendar/provider/storage and English/Urdu controls pass local tests. Delivery with the app closed, reboot, denied/revoked permissions, OEM battery behavior, and signed Android acceptance remain pending; see scripts/qa/PRAYER_REMINDERS.md.
 
 ### 13. Prayer Page
 - [x] Normal user view with prayer times, sunrise, sunset, countdown ("X hours remaining"), and localized prayer names
@@ -140,6 +140,12 @@ Prior completion claims are not release evidence. See MVP_REVIEW.md for source-c
 
 ## Launch implementation tracker
 [launchplan.md](launchplan.md) tracks current phases and evidence. Phase 1 and the core Phase 2 code/rules pass local checks; production migration, client acceptance, and Android device QA remain open. Earlier checks do not certify the current build.
+
+## 2026-10-14 reminders and deployed security audit
+
+Optional configurable Android reminders are implemented and pass 28 new local logic/UI tests (38 Flutter tests total), with clean analysis. Playwright checked lead selection, custom validation, persistence and Urdu layout. Native delivery/reboot and signed device acceptance remain pending. Post/event metadata rules and orphan-parent checks pass 35 local rule tests.
+
+The read-only production audit confirmed the old deployed email-based rules from 16 September, missing current comment/approval/cleanup permissions. Public launch remains blocked until the reviewed migration, trusted grants, coordinated rules/index deployment and staging/device acceptance pass. See scripts/qa/PRODUCTION_AUDIT.md; no production changes were made.
 
 
 ## 2026-10-14 UI and launch-readiness pass

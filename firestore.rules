@@ -7,6 +7,25 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Keep the existing ISO-string ordering until a reviewed timestamp migration.
+    // Malformed client metadata must not break public feed deserialization.
+    function isIsoDate(value) {
+      return value is string && value.matches('[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]([.][0-9]{1,6})?Z?');
+    }
+
+    function validEventText(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+        data.description is string && data.description.size() <= 4000 &&
+        isIsoDate(data.eventDate) && data.startTime is string && data.startTime.size() <= 20 &&
+        data.endTime is string && data.endTime.size() <= 20 &&
+        (data.get('location', null) == null || (data.location is string && data.location.size() <= 500)) &&
+        (data.get('category', null) == null || (data.category is string && data.category.size() <= 100)) &&
+        (data.get('createdByName', null) == null || (data.createdByName is string && data.createdByName.size() <= 100)) &&
+        (data.get('masjidName', null) == null || (data.masjidName is string && data.masjidName.size() <= 200)) &&
+        (data.get('mediaUrl', null) == null || (data.mediaUrl is string && data.mediaUrl.size() <= 2000)) &&
+        data.get('mediaType', null) in [null, 'image', 'video'];
+    }
+
     function getUserDoc(userId) {
       return get(/databases/$(database)/documents/users/$(userId)).data;
     }
@@ -64,8 +83,15 @@ service cloud.firestore {
 
         // Any signed-in user can create a question (must set correct masjidId)
         allow create: if isActiveUser() &&
+          exists(/databases/$(database)/documents/masjids/$(masjidId)) &&
+          request.resource.data.id == questionId &&
           request.resource.data.masjidId == masjidId &&
           request.resource.data.createdByUid == request.auth.uid &&
+          request.resource.data.userName is string &&
+          request.resource.data.userName.size() > 0 &&
+          request.resource.data.userName.size() <= 100 &&
+          request.resource.data.isAnonymous is bool &&
+          isIsoDate(request.resource.data.timestamp) &&
           request.resource.data.questionText is string &&
           request.resource.data.questionText.size() > 0 &&
           request.resource.data.questionText.size() <= 4000 &&
@@ -121,11 +147,10 @@ service cloud.firestore {
           (isSignedIn() && resource.data.createdByUid == request.auth.uid);
 
         allow create: if isActiveUser() &&
+          exists(/databases/$(database)/documents/masjids/$(masjidId)) &&
           request.resource.data.masjidId == masjidId &&
           request.resource.data.createdByUid == request.auth.uid &&
-          request.resource.data.title is string && request.resource.data.title.size() > 0 &&
-          request.resource.data.title.size() <= 200 &&
-          request.resource.data.description is string && request.resource.data.description.size() <= 4000 &&
+          validEventText(request.resource.data) &&
           ((isMasjidManager(masjidId) || isSuperAdmin()) &&
             request.resource.data.status in ['pending', 'approved'] ||
            (getUserDoc(request.auth.uid).role == 'verified_muqtaddi' &&
@@ -137,6 +162,7 @@ service cloud.firestore {
                request.resource.data.status == 'approved'))));
 
         allow update: if (isMasjidManager(masjidId) || isSuperAdmin()) &&
+          validEventText(request.resource.data) &&
           request.resource.data.masjidId == resource.data.masjidId &&
           request.resource.data.createdByUid == resource.data.get('createdByUid', null) &&
           request.resource.data.status in ['pending', 'approved', 'rejected'];

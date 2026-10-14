@@ -1,7 +1,10 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import '../models/prayer_reminder.dart';
+import 'prayer_reminder_store.dart';
 
 /// Service class for local storage using shared_preferences
-class StorageService {
+class StorageService implements PrayerReminderStore {
   static final StorageService _instance = StorageService._internal();
   late SharedPreferences _preferences;
 
@@ -35,7 +38,10 @@ class StorageService {
   Future<bool> saveAdminLoginStatus(String masjidId, String username) async {
     await _preferences.setString('adminMasjidId', masjidId);
     await _preferences.setString('adminUsername', username);
-    return await _preferences.setString('lastAdminLogin', DateTime.now().toString());
+    return await _preferences.setString(
+      'lastAdminLogin',
+      DateTime.now().toString(),
+    );
   }
 
   /// Get admin login status
@@ -87,13 +93,27 @@ class StorageService {
     return await _preferences.clear();
   }
 
-  /// Save notifications preference
-  Future<bool> saveNotificationsEnabled(bool enabled) async {
-    return await _preferences.setBool('notifications_enabled', enabled);
+  @override
+  PrayerReminderPreferences loadPrayerReminders() {
+    try {
+      final stored = _preferences.getString('prayer_reminders_v1');
+      if (stored == null) return const PrayerReminderPreferences();
+      return PrayerReminderPreferences.fromJson(
+        jsonDecode(stored) as Map<String, dynamic>,
+      );
+    } catch (_) {
+      return const PrayerReminderPreferences();
+    }
   }
 
-  /// Get notifications preference
-  bool getNotificationsEnabled() {
-    return _preferences.getBool('notifications_enabled') ?? true;
+  @override
+  Future<void> savePrayerReminders(
+    PrayerReminderPreferences preferences,
+  ) async {
+    final saved = await _preferences.setString(
+      'prayer_reminders_v1',
+      jsonEncode(preferences.toJson()),
+    );
+    if (!saved) throw StateError('Could not save prayer reminder preferences');
   }
 }

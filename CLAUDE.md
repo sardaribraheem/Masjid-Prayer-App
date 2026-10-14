@@ -5,7 +5,7 @@
 ## 1. Overview & Vision
 - **App**: Masjid Prayer App for the Hassan Masjid community and general deployment.
 - **Goal**: Allow users to select a masjid, view prayer times, browse/propose community events, ask questions answered by imams/admins, request verification, and manage settings (dark mode, English/Urdu, RTL). Admins/imams manage prayer times, events, Q&A, and verification requests.
-- **Tech Stack**: Flutter (^3.9.0 / 3.44.x), Dart (^3.9.0), Firebase (Auth + Firestore), Local state (`shared_preferences` + Provider/ChangeNotifier).
+- **Tech Stack**: Flutter 3.44.x, Dart (^3.10.0), Firebase (Auth + Firestore), Local state (`shared_preferences` + Provider/ChangeNotifier), optional local Android prayer reminders.
 - **Firebase Project**: `masjid-prayer-app-49f50` (`lib/firebase_options.dart` for web; `google-services.json` for Android).
 
 ## 2. Architecture & File Structure
@@ -50,7 +50,8 @@
 - `masjid_provider.dart`: Masjid list, filtering, selection, distance sort.
 - `masjid_claim_provider.dart`: Masjid claims & registrations.
 - `location_provider.dart`: GPS state.
-- `settings_provider.dart`: Dark mode / language / notifications persistence.
+- `settings_provider.dart`: Dark mode / language persistence.
+- `prayer_reminder_provider.dart`: Optional local Android reminder preferences, permission recovery and timetable synchronization. Actual device delivery acceptance remains open.
 
 ## 3. Role & Permission Model
 - **UserRole Enum**: `guest` → `muqtaddi` → `verifiedMuqtaddi` → `imam` → `admin` (Ultimate Admin).

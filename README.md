@@ -8,7 +8,11 @@ The current implementation has local Flutter, security-emulator, and browser QA 
 
 Android is the only launch target. The final application ID remains pending; the existing registration is `com.example.masjid_app`. Release signing, reviewed production role migration, rules/index deployment, and real-device acceptance remain release gates. See [Android release instructions](scripts/qa/ANDROID_RELEASE.md).
 
-Notification scheduling and attendance registration are deferred. Google sign-in UI is disabled unless `ENABLE_GOOGLE_SIGN_IN=true`; enable it only after OAuth configuration and device verification. Community attachments and uploads are excluded. Anonymous posting hides the display name; stored author UIDs remain readable.
+Optional local Android prayer reminders are implemented: default 15 minutes, presets including 20 minutes, or a custom 1–60 minute lead for the selected masjid. Friday uses Jummah instead of Dhuhr when set. Reminders are off until the user enables them and grants notification/alarm permissions. They use the phone timezone and last saved timetable; reopen the app to refresh changes. Actual delivery/reboot acceptance is still pending; see [reminder QA](scripts/qa/PRAYER_REMINDERS.md). No Storage uploads or paid server scheduler are added.
+
+Attendance registration remains deferred. Google sign-in UI is disabled unless `ENABLE_GOOGLE_SIGN_IN=true`; enable it only after OAuth configuration and device verification. Community attachments and uploads are excluded. Anonymous posting hides the display name; stored author UIDs remain readable.
+
+**Production security blocker:** a read-only audit on 14 October retrieved the older deployed email-based rules, last updated 16 September. They do not match the locally tested rules or current client workflows. Reviewed grants/migration, administrator bootstrap, rules/index deployment, and staging verification are required before launch. See [production audit](scripts/qa/PRODUCTION_AUDIT.md).
 
 ## Development
 

@@ -3,17 +3,15 @@ import '../services/storage_service.dart';
 import '../theme/app_state.dart';
 import '../l10n/app_localization.dart';
 
-/// Provides persisted settings state (dark mode, language, notifications).
+/// Provides persisted theme and language state.
 /// Wraps StorageService and appStateProvider/appLocalization in a reactive provider.
 class SettingsProvider extends ChangeNotifier {
   final StorageService _storageService = StorageService();
 
   bool _isDarkMode = false;
-  bool _notificationsEnabled = true;
   String _locale = 'en';
 
   bool get isDarkMode => _isDarkMode;
-  bool get notificationsEnabled => _notificationsEnabled;
   String get locale => _locale;
 
   SettingsProvider() {
@@ -28,13 +26,6 @@ class SettingsProvider extends ChangeNotifier {
     _isDarkMode = !_isDarkMode;
     appStateProvider.setDarkMode(_isDarkMode);
     await _storageService.saveTheme(_isDarkMode ? 'dark' : 'light');
-    notifyListeners();
-  }
-
-  /// Toggle notifications and persist
-  Future<void> toggleNotifications() async {
-    _notificationsEnabled = !_notificationsEnabled;
-    await _storageService.saveNotificationsEnabled(_notificationsEnabled);
     notifyListeners();
   }
 

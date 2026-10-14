@@ -8,6 +8,7 @@ import '../providers/masjid_provider.dart';
 import '../l10n/app_localization.dart';
 import '../l10n/app_strings.dart';
 import '../widgets/delete_account_dialog.dart';
+import '../widgets/prayer_reminder_settings.dart';
 import 'admin_login_screen.dart';
 import 'admin_panel_screen.dart';
 import 'edit_profile_screen.dart';
@@ -213,6 +214,8 @@ class SettingsPage extends StatelessWidget {
                 ],
               ),
             ),
+            _heading(context, appLocalization.t('prayer_reminders')),
+            const PrayerReminderSettings(),
             _heading(context, appLocalization.t('settings_management')),
             Card(
               child: Column(

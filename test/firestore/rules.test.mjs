@@ -117,8 +117,20 @@ test('failed approval rolls back other writes', async () => {
 test('community posts are text-only and cannot impersonate an author or supply an answer', async () => {
   await assertSucceeds(setDoc(doc(user(), 'masjids/a/questions/new'), post({id: 'new'})));
   for (const extra of [{mediaUrl: 'https://example.com/a.jpg'}, {mediaType: 'video'}, {createdByUid: 'imam'}, {answer: 'Pretend imam answer'}, {isAnswered: true}, {questionText: ''}, {questionText: 'x'.repeat(4001)}]) {
-    await assertFails(setDoc(doc(user(), 'masjids/a/questions/invalid'), post(extra)));
+    await assertFails(setDoc(doc(user(), 'masjids/a/questions/invalid'), post({id: 'invalid', ...extra})));
   }
+});
+test('post metadata rejects malformed feed types, dates, and mismatched IDs', async () => {
+  for (const extra of [{id: 'wrong'}, {userName: 12}, {userName: ''}, {userName: 'x'.repeat(101)}, {isAnonymous: 'yes'}, {timestamp: 'yesterday'}, {timestamp: new Date()}, {timestamp: '2026-10-14T25:00:00.000'}, {timestamp: '2026-13-14T12:00:00.000'}]) {
+    await assertFails(setDoc(doc(user(), 'masjids/a/questions/invalid'), post({id: 'invalid', ...extra})));
+  }
+  await assertSucceeds(setDoc(doc(user(), 'masjids/a/questions/local'), post({id: 'local', timestamp: '2026-10-14T12:00:00.123456'})));
+  await assertSucceeds(setDoc(doc(user(), 'masjids/a/questions/utc'), post({id: 'utc', timestamp: '2026-10-14T12:00:00.000Z'})));
+});
+test('posts cannot be created below missing or deleted masjids', async () => {
+  await assertFails(setDoc(doc(user(), 'masjids/missing/questions/new'), post({id: 'new', masjidId: 'missing'})));
+  await deleteDoc(doc(admin(), 'masjids/a'));
+  await assertFails(setDoc(doc(user(), 'masjids/a/questions/new'), post({id: 'new'})));
 });
 test('only assigned managers can answer posts', async () => {
   await assertSucceeds(updateDoc(doc(user('imam'), 'masjids/a/questions/p'), {answer: 'Answer', isAnswered: true}));
@@ -181,6 +193,23 @@ test('assigned managers review only their own masjid members', async () => {
   await assertFails(getDocs(query(collection(db, 'users'), where('masjidId', '==', 'b'))));
 });
 const event = (extra = {}) => ({id: 'event', title: 'Class', description: 'A community class', masjidId: 'a', createdByUid: 'member', createdByName: 'Member', eventDate: new Date().toISOString(), startTime: '5:00 PM', endTime: '6:00 PM', status: 'pending', ...extra});
+test('event metadata is bounded and typed for members and manager edits', async () => {
+  await updateDoc(doc(admin(), 'users/member'), {role: 'verified_muqtaddi', verificationStatus: 'approved', eventPermission: 'full'});
+  const malformed = [{title: ''}, {title: 'x'.repeat(201)}, {description: 42}, {description: 'x'.repeat(4001)}, {eventDate: 'bad-date'}, {startTime: []}, {endTime: 42}, {location: 'x'.repeat(501)}, {category: true}, {createdByName: 42}, {masjidName: []}, {mediaUrl: []}, {mediaType: 'invalid'}];
+  for (const extra of malformed) {
+    await assertFails(setDoc(doc(user(), 'masjids/a/events/invalid'), event(extra)));
+  }
+  await assertSucceeds(setDoc(doc(user(), 'masjids/a/events/event'), event()));
+  for (const extra of malformed) {
+    await assertFails(updateDoc(doc(user('imam'), 'masjids/a/events/event'), extra));
+  }
+  await assertSucceeds(updateDoc(doc(user('imam'), 'masjids/a/events/event'), {status: 'approved', title: 'Updated class'}));
+});
+test('full event permission does not authorize orphan events after masjid deletion', async () => {
+  await updateDoc(doc(admin(), 'users/member'), {role: 'verified_muqtaddi', verificationStatus: 'approved', eventPermission: 'full'});
+  await deleteDoc(doc(admin(), 'masjids/a'));
+  await assertFails(setDoc(doc(user(), 'masjids/a/events/event'), event({status: 'approved'})));
+});
 test('verified members propose pending events but cannot approve them', async () => {
   await assertFails(setDoc(doc(user(), 'masjids/a/events/event'), event()));
   await updateDoc(doc(admin(), 'users/member'), {role: 'verified_muqtaddi', verificationStatus: 'approved', eventPermission: 'approval_required'});

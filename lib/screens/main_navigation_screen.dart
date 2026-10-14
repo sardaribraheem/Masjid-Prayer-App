@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/prayer_reminder_provider.dart';
 import '../l10n/app_localization.dart';
 import '../l10n/app_strings.dart';
 import '../widgets/app_icon.dart';
@@ -18,6 +20,23 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _selectedIndex = 0;
+  int _seenReminderTap = 0;
+
+  Widget _buildWithReminderNavigation(BuildContext context) {
+    final tap = context.select<PrayerReminderProvider, int>(
+      (provider) => provider.tapRevision,
+    );
+    if (tap != _seenReminderTap) {
+      _seenReminderTap = tap;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _onItemTapped(0);
+      });
+    }
+    return ListenableBuilder(
+      listenable: appLocalization,
+      builder: (context, _) => _buildLocalized(context),
+    );
+  }
 
   // The 4 pages
   late final List<Widget> _pages = [
@@ -34,10 +53,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
-    listenable: appLocalization,
-    builder: (context, _) => _buildLocalized(context),
-  );
+  Widget build(BuildContext context) => _buildWithReminderNavigation(context);
 
   Widget _buildLocalized(BuildContext context) {
     return Scaffold(

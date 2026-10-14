@@ -12,4 +12,4 @@ Read CLAUDE.md, FINALTODO.md, and launchplan.md before changes. Inspect files re
 - Do not deploy rules or release builds implicitly during code review.
 
 - Super-admin authorization uses the server-issued `superAdmin` claim; email strings confer no privileges. Do not bypass the reviewed bootstrap/migration process.
-- Spark MVP excludes notification scheduling and event attendance registration until implemented and tested; do not mark them complete.
+- Optional local Android prayer reminders are implemented at the owner's request. Keep device delivery, reboot, and permission-revocation acceptance pending until tested; do not mark them release verified. Event attendance registration remains deferred.
